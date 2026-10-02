@@ -95,7 +95,9 @@ export function makeEnv(opts = {}) {
       walk(home);
       return text;
     },
-    cleanup() { fs.rmSync(root, { recursive: true, force: true }); },
+    // Retries: on Windows a just-exited detached worker can still hold the project dir open for a moment
+    // (EBUSY on rmdir, seen in CI). rmSync retries EBUSY/EPERM/ENOTEMPTY with linear backoff.
+    cleanup() { fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); },
   };
   return t;
 }
