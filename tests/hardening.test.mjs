@@ -245,13 +245,19 @@ test('detached workers (no SCRATCHPOOL_NO_DETACH): tick returns at once and the 
     assert.equal(r.json.pools[0].started, 1);
     const deadline = Date.now() + 30000;
     let st;
+    let workerPid = null;
     while (Date.now() < deadline) {
       st = t.state().entries[0];
+      workerPid = st?.pid || workerPid; // the pid is cleared when the entry turns ready
       if (st?.status === 'ready') break;
       await new Promise((res) => setTimeout(res, 200));
     }
     assert.equal(st?.status, 'ready', JSON.stringify(st));
     assert.ok(st.username);
+    // The worker writes 'ready' and only then exits. Its cwd is the project dir, so on Windows cleanup
+    // fails with EBUSY until it has gone: wait for it.
+    const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+    while (workerPid && alive(workerPid) && Date.now() < deadline + 15000) await new Promise((res) => setTimeout(res, 100));
   } finally { t.cleanup(); }
 });
 

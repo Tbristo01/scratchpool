@@ -20,6 +20,7 @@ Start with the [project README](../README.md) for the quick start.
 | [SPEC](SPEC.md) | The implementation contract: commands, `scratchpool/v1` JSON output, exit codes, state files, the `sf` command allowlist |
 | [Security model](security.md) | What scratchpool can and cannot touch, secret handling, and the recommended [Claude Code deny rules](../examples/settings.deny.json) |
 | [Benchmarks](benchmarks.md) | Measured warm claim versus cold create, with the setup used for each run |
+| [Repository controls](repository-controls.md) | Branch protection, required checks, protected tags, the approval-gated release, provenance attestations and the other supply-chain controls, with a command to verify each |
 | [Demo](demo/) | The real terminal recording (`scratchpool-demo.cast`) and the animated SVG in the README |
 
 To regenerate the demo SVG after re-recording:
@@ -35,4 +36,4 @@ python3 scripts/cast-to-svg.py docs/demo/scratchpool-demo.cast --text   # check 
 
 ## Project
 
-[CHANGELOG](../CHANGELOG.md) · [Contributing](../CONTRIBUTING.md) · [Code of Conduct](../CODE_OF_CONDUCT.md) · [Security policy](../SECURITY.md) · [License](../LICENSE)
+[CHANGELOG](../CHANGELOG.md) · [Contributing](../CONTRIBUTING.md) · [Governance](../GOVERNANCE.md) · [Releasing](../RELEASING.md) · [Code of Conduct](../CODE_OF_CONDUCT.md) · [Security policy](../SECURITY.md) · [License](../LICENSE)

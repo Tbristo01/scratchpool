@@ -1,0 +1,18 @@
+# Code owners are requested for review automatically on every pull request.
+# scratchpool has a single maintainer (see GOVERNANCE.md), so every path is owned by @Tbristo01.
+# The explicit lines below mark the security-sensitive areas; keep them when ownership is shared later.
+
+*                    @Tbristo01
+
+# The skill itself: the code that spawns sf and deletes orgs.
+/skills/             @Tbristo01
+
+# CI, release, Dependabot, CODEOWNERS and templates: what runs with repository tokens.
+/.github/            @Tbristo01
+
+# Plugin and marketplace manifests: what Claude Code installs.
+/.claude-plugin/     @Tbristo01
+
+# Security model and vulnerability reporting policy.
+/docs/security.md    @Tbristo01
+/SECURITY.md         @Tbristo01

@@ -16,3 +16,13 @@
 - [ ] `CHANGELOG.md` updated under **Unreleased** for user-visible changes
 - [ ] `README.md` / `docs/` updated if commands, flags, config keys or install steps changed
 - [ ] No email addresses or personal data added
+
+## Security impact
+
+<!-- Tick every box that applies and explain it under "What and why". An unticked list means "none of these". -->
+
+- [ ] Touches `.github/workflows/`, workflow `permissions:`, CODEOWNERS or `dependabot.yml` (every new action pinned to a full commit SHA with a version comment, and on the Actions allowlist; job names of required checks unchanged)
+- [ ] Adds or upgrades a dependency, dev tool or GitHub Action
+- [ ] Adds or changes a destructive org operation (`release`, recycling, orphan reaping, anything that deletes a scratch org or `ScratchOrgInfo` record)
+- [ ] Changes secret handling or the output allowlist (fields copied from `sf` JSON, scrubbing, logs, what an agent can see)
+- [ ] Changes the scheduler entries, the setup hook trust check, or the skill's `allowed-tools`

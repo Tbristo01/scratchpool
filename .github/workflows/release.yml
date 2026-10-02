@@ -8,11 +8,14 @@ permissions:
   contents: read
 
 # Every action is pinned to a full commit SHA (release tag in the trailing comment).
-# Tests run in a read-only job; only the release job, which runs no project code, can write.
+# Tests run in a read-only job. Only the release job, which runs no project code, can write, and it
+# runs in the 'release' environment: it waits for the maintainer's approval and is deployable only
+# from v* tags. The procedure is in RELEASING.md.
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -30,22 +33,61 @@ jobs:
   release:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release # approval gate: required reviewer + v* tags only
     permissions:
       contents: write # create the GitHub Release and upload assets
+      id-token: write # OIDC token to sign the build provenance (Sigstore)
+      attestations: write # store the attestation on the repository
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Check tag matches plugin.json version
+      - name: Check tag matches plugin.json, package.json and SKILL.md versions
         id: ver
         shell: bash
         run: |
           version=$(node -p 'require("./.claude-plugin/plugin.json").version')
+          pkg=$(node -p 'require("./package.json").version')
           if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
             echo "::error::tag ${GITHUB_REF_NAME} does not match plugin.json version ${version}"
             exit 1
           fi
+          if [ "${pkg}" != "${version}" ]; then
+            echo "::error::package.json version ${pkg} does not match plugin.json version ${version}"
+            exit 1
+          fi
+          if ! grep -qE "^  version: \"${version//./\\.}\"\$" skills/scratchpool/SKILL.md; then
+            echo "::error::skills/scratchpool/SKILL.md metadata.version is not \"${version}\""
+            exit 1
+          fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # The body of the "## [X.Y.Z]" section, up to the next "## [" heading,
+          # without the Markdown link definitions at the end of the file.
+          awk -v v="$VERSION" '
+            /^## \[/ { if (found) exit; if (index($0, "## [" v "]") == 1) { found = 1; next } }
+            found && !/^\[[^]]*\]: / { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::error::CHANGELOG.md has no '## [${VERSION}]' section (or it is empty). See RELEASING.md."
+            exit 1
+          fi
+          {
+            echo
+            echo '### Verify this release'
+            echo
+            echo '```sh'
+            echo "sha256sum -c SHA256SUMS"
+            echo "gh attestation verify scratchpool-skill-${VERSION}.zip --repo ${GITHUB_REPOSITORY} \\"
+            echo "  --signer-workflow ${GITHUB_REPOSITORY}/.github/workflows/release.yml --source-ref ${GITHUB_REF}"
+            echo '```'
+          } >> "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
       - name: Build skill zip and SHA256SUMS
         shell: bash
         env:
@@ -59,6 +101,10 @@ jobs:
           (cd stage && zip -r -X "../dist/scratchpool-skill-${VERSION}.zip" scratchpool -x '*.DS_Store')
           (cd dist && sha256sum ./*.zip | sed 's# \./# #' > SHA256SUMS)
           cat dist/SHA256SUMS
+      - name: Attest build provenance for the skill zip
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/scratchpool-skill-${{ steps.ver.outputs.version }}.zip
       - name: Create GitHub Release
         shell: bash
         env:
@@ -67,4 +113,4 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             "dist/scratchpool-skill-${VERSION}.zip" dist/SHA256SUMS \
-            --verify-tag --title "scratchpool ${GITHUB_REF_NAME}" --generate-notes
+            --verify-tag --title "scratchpool ${GITHUB_REF_NAME}" --notes-file "$RUNNER_TEMP/notes.md"

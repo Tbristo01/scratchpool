@@ -11,7 +11,13 @@ The version lives in `.claude-plugin/plugin.json` (mirrored in `package.json`).
 - `NO_DEVHUB` hint now uses the long form `sf org login web --set-default-dev-hub --alias <alias>`, matching the README.
 - Skill description: a warm claim takes about two seconds (was "about a second"), matching the measured 1.9 to 2.9 s.
 
+### Security
+- Release hardening: the release job now runs in the approval-gated `release` environment, attaches a build provenance attestation for the skill zip (verify with `gh attestation verify` and `--signer-workflow`/`--source-ref`, see `RELEASING.md`), checks the tag against `plugin.json`, `package.json` and `SKILL.md` (CI now checks `SKILL.md` too), and takes its notes from the matching CHANGELOG section.
+- Supply-chain checks: an advisory dependency review check on PRs (fails on moderate or higher advisories in any dependency scope and on non-Apache-compatible runtime licenses; not a required check), OpenSSF Scorecard with a README badge, CODEOWNERS, and grouped weekly Dependabot updates for pinned actions.
+- CI: every job has a timeout, and a new push to a PR cancels that PR's superseded run (runs on `main` are never cancelled).
+
 ### Documentation
+- `RELEASING.md` (release procedure), `GOVERNANCE.md` (maintainer model, decisions, security report flow) and `docs/repository-controls.md` (every repository control, what it prevents and how to verify it); a security-impact checklist in the PR template.
 - README: uninstall steps for every install path, Dev Hub enablement and Developer Edition limits, `npm install -g` / `npx -y` / pinned `#v0.1.0` forms, `npx skills add` behaviour, what `init` writes, `init --duration`, a readable top-to-bottom diagram, a Commands table without flags in the first column, and the updated Dev Hub docs link.
 - Demo: removed raw Markdown `**` from the Claude Code reply in the recording and regenerated the SVG.
 
