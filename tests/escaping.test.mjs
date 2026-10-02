@@ -175,7 +175,8 @@ function oclifChain(dir) {
     '@echo off', 'setlocal enableextensions', '',
     `if exist "${inner}" (`, `  "${inner}" %*`, ') else (', `  node "${stubJs}" %*`, ')', '',
   ].join('\r\n'));
-  fs.writeFileSync(inner, ['@echo off', 'setlocal enableextensions', '', `node "${stubJs}" %*`, ''].join('\r\n'));
+  // The inner shim leaves a marker, so the test can tell the chained branch (three parses) really ran.
+  fs.writeFileSync(inner, ['@echo off', 'setlocal enableextensions', 'type nul > "%~dp0used"', `node "${stubJs}" %*`, ''].join('\r\n'));
   return outer;
 }
 
@@ -193,6 +194,7 @@ test('cmd.exe line (real cmd.exe + stub sf.cmd, and an oclif-shaped chained sf.c
       const calls = fs.readFileSync(scenario + '.calls.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l));
       assert.deepEqual(calls.at(-1).argv, args, bin);
       assert.ok(!fs.existsSync(marker), `no injected command ran via ${bin}`);
+      if (bin !== STUB) assert.ok(fs.existsSync(path.join(dir, 'client', 'bin', 'used')), 'the outer sf.cmd chained to the client sf.cmd');
       // A quote is refused before anything is spawned, whatever the shim chain.
       assert.throws(() => new Sf(bin).raw(['org', 'list', `x" & echo pwned > "${marker}`]), (e) => e.code === 'USAGE');
       assert.ok(!fs.existsSync(marker));
