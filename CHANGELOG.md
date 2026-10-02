@@ -7,6 +7,7 @@ The version lives in `.claude-plugin/plugin.json` (mirrored in `package.json`).
 ## [Unreleased]
 
 ### Changed
+- README condensed from 222 to about 110 lines; full install, prerequisites and uninstall steps moved to `docs/install.md`.
 - `NO_DEVHUB` hint now uses the long form `sf org login web --set-default-dev-hub --alias <alias>`, matching the README.
 - Skill description: a warm claim takes about two seconds (was "about a second"), matching the measured 1.9 to 2.9 s.
 
