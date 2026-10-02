@@ -1,7 +1,7 @@
 ---
 name: scratchpool
 description: >-
-  Hands out a ready-to-use Salesforce scratch org in about a second from a small
+  Hands out a ready-to-use Salesforce scratch org in about two seconds from a small
   pool that lives on the user's own machine and refills itself in the background
   with the user's own Dev Hub. Use when the user asks for a scratch org, a
   throwaway or quick org, an org for a repro, bug, ticket, PR or spike, an org
@@ -93,7 +93,7 @@ Add `--pool <name>` when the user has several pools and the cwd is outside the p
 | `POOL_EMPTY` | No warm org right now (refill in ~`refillEtaMin` min). Ask: wait, or create one now (blocking, a few minutes, uses one daily create); only after their yes, run `claim <alias> --cold --yes --no-open`. |
 | `LIMIT` | The Dev Hub is out of active or daily scratch orgs. Release orgs they no longer need, or wait for the 24 h window. |
 | `CONFIRM_REQUIRED` | The command needs the user's explicit yes; ask, then re-run with `--yes`. |
-| `NO_DEVHUB` | That alias is not an authenticated Dev Hub. They should run `sf org login web --set-default-dev-hub -a <alias>` themselves. |
+| `NO_DEVHUB` | That alias is not an authenticated Dev Hub. They should run `sf org login web --set-default-dev-hub --alias <alias>` themselves. |
 | `NOT_A_PROJECT` | Not inside a Salesforce DX project (no `sfdx-project.json`). |
 | `NOT_SCRATCH` / `NOT_MINE` | That org is not a scratch org from this pool's Dev Hub; scratchpool will not touch it. |
 | `NOT_MANAGED` | A scratch org of their hub, but not in this pool. They can delete it with `sf org delete scratch` if they want. |

@@ -6,6 +6,14 @@ The version lives in `.claude-plugin/plugin.json` (mirrored in `package.json`).
 
 ## [Unreleased]
 
+### Changed
+- `NO_DEVHUB` hint now uses the long form `sf org login web --set-default-dev-hub --alias <alias>`, matching the README.
+- Skill description: a warm claim takes about two seconds (was "about a second"), matching the measured 1.9 to 2.9 s.
+
+### Documentation
+- README: uninstall steps for every install path, Dev Hub enablement and Developer Edition limits, `npm install -g` / `npx -y` / pinned `#v0.1.0` forms, `npx skills add` behaviour, what `init` writes, `init --duration`, a readable top-to-bottom diagram, a Commands table without flags in the first column, and the updated Dev Hub docs link.
+- Demo: removed raw Markdown `**` from the Claude Code reply in the recording and regenerated the SVG.
+
 ## [0.1.0] - 2026-10-02
 
 First release. A warm pool of ready Salesforce scratch orgs, managed entirely on the developer's own machine.

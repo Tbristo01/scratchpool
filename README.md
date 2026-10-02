@@ -8,6 +8,8 @@
 
 ![scratchpool demo: init, status, claim in 1.9 s, query the deployed classes, release, and the same claim from Claude Code](docs/demo/scratchpool-demo.svg)
 
+On a phone? [Open the demo full size](docs/demo/scratchpool-demo.svg).
+
 **Measured so far:** warm `claim` 1.9 to 2.9 s, against 15.5 s for a cold create plus deploy on a 5-class smoke project. That smoke project is the best case for cold creates, so this proves the mechanism, not the savings. A benchmark on real repos (package installs, data loads, features) is pending. See [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Why
@@ -21,7 +23,7 @@
 
 ## Install
 
-Pick one. Every path runs the same zero-dependency Node script.
+Pick one. Every path runs the same zero-dependency Node script. Only the global npm install below puts a `scratchpool` command on your PATH; the agent paths run the script from the installed skill folder.
 
 **Claude Code (plugin).** In a Claude Code session:
 
@@ -38,21 +40,32 @@ Or from a shell: `claude plugin marketplace add Tbristo01/scratchpool && claude 
 npx skills add Tbristo01/scratchpool
 ```
 
-**Plain CLI** (not on the npm registry; runs straight from GitHub):
+Run inside an agent, this installs into `.agents/skills/` without prompting and links it for the agent it detects. In a normal terminal it asks for the scope and agents; pass `-y --agent <name>` to skip the prompts, or `-g` for a user-level install. It also writes a `skills-lock.json` in the project and sends the skills CLI's own install telemetry event (scratchpool itself sends none).
+
+**Plain CLI** (not on the npm registry; installs straight from GitHub):
 
 ```sh
-npx github:Tbristo01/scratchpool --help
-# or
-git clone https://github.com/Tbristo01/scratchpool && node scratchpool/skills/scratchpool/scripts/scratchpool.mjs --help
+npm install -g github:Tbristo01/scratchpool          # puts `scratchpool` on your PATH
+npx -y github:Tbristo01/scratchpool --help           # or run it without installing
+npx -y github:Tbristo01/scratchpool#v0.1.0 --help    # pinned to a release
 ```
+
+Or clone it, and use `node scratchpool/skills/scratchpool/scripts/scratchpool.mjs` wherever this README says `scratchpool`:
+
+```sh
+git clone https://github.com/Tbristo01/scratchpool
+node scratchpool/skills/scratchpool/scripts/scratchpool.mjs --help
+```
+
+In a terminal, `--help` and `--version` print plain text. When stdout is not a terminal (a pipe, CI or an agent), every command, these two included, prints one JSON object instead; see [Commands](#commands).
 
 **claude.ai.** Download `scratchpool-skill-<version>.zip` from the [latest release](https://github.com/Tbristo01/scratchpool/releases/latest) (check it against `SHA256SUMS`) and upload it as a custom skill under Settings > Capabilities.
 
 ### Prerequisites
 
-- [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`) 2.147.7 or later
+- [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`) 2.147.7 or later (needed for the scratch org signup variables in [docs/ci-auth.md](docs/ci-auth.md); older versions still run, with an `SF_OLD` warning)
 - Node.js 20 or later
-- A [Dev Hub](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_setup_enable_devhub.htm) you have authorised in `sf` (`sf org login web --set-default-dev-hub --alias my-devhub`)
+- A Dev Hub you have authorised in `sf` (`sf org login web --set-default-dev-hub --alias my-devhub`). To get one, [enable Dev Hub](https://developer.salesforce.com/docs/platform/sfdx-dev/guide/sfdx-setup-enable-devhub.html) in Setup on a production or Developer Edition org; once enabled it cannot be turned off. A Developer Edition Dev Hub allows 3 active and 6 daily scratch orgs (see [Limits and sizing](#limits-and-sizing))
 - A project with `sfdx-project.json` and a scratch org definition (default `config/project-scratch-def.json`) or a [snapshot](docs/snapshots.md)
 
 ## 60-second quick start
@@ -67,7 +80,7 @@ git clone https://github.com/Tbristo01/scratchpool && node scratchpool/skills/sc
 >
 > I'm done with PROJ-123, release it
 
-**From a terminal** (use `npx github:Tbristo01/scratchpool` in place of `scratchpool` if you did not clone):
+**From a terminal** (if you did not `npm install -g`, use `npx -y github:Tbristo01/scratchpool` or `node <clone>/skills/scratchpool/scripts/scratchpool.mjs` in place of `scratchpool`):
 
 ```sh
 scratchpool init --hub my-devhub --size 2   # configure, install the scheduler, start filling
@@ -82,15 +95,27 @@ The first orgs take a normal create (plus your setup hook) to warm up. After tha
 
 | Command | What it does |
 |---|---|
-| `init [--hub] [--size] [--def \| --snapshot] [--interval] [--setup-hook] [--no-service]` | Configure the pool for this project, install the background service, run a first tick. Safe to re-run |
-| `claim [alias] [--cold [--yes]] [--any] [--no-open]` | Take a warm org, rename it to `alias` and make it the default. Empty pool: `POOL_EMPTY` (agents) or a cold create (interactive, or `--cold --yes` from scripts and agents) |
-| `release <alias...> \| --pool-orgs \| --surplus \| --stale \| --orphans [--yes]` | Delete orgs you own and free their slots. Alias: `return` |
+| `init` | Configure the pool for this project, install the background service, run a first tick. Safe to re-run |
+| `claim [alias]` | Take a warm org, rename it to `alias` and make it this project's default org. Empty pool: `POOL_EMPTY` (agents) or a cold create (interactive, or `--cold --yes` from scripts and agents) |
+| `release <alias…>` | Delete orgs you own and free their slots. Alias: `return` |
 | `status` | Pool entries, life left, Dev Hub limits, service state. Alias: `list` |
-| `config show \| get <key> \| set <key> <value>` | Read or change pool settings |
+| `config` | `show`, `get <key>` or `set <key> <value>`: read or change pool settings |
 | `pause` / `resume` | Stop or restart refilling. Claims still work while paused |
 | `tick` | What the scheduler runs. Run it yourself to fill now |
-| `service install \| uninstall \| status` | Manage the per-user scheduler entry |
-| `uninstall [--release-pool-orgs] [--yes]` | Remove the service and optionally the pool orgs. Claimed orgs are kept |
+| `service` | `install`, `uninstall` or `status` of the per-user scheduler entry |
+| `uninstall` | Remove the service and optionally the pool orgs. Claimed orgs are kept |
+
+Flags:
+
+```text
+init       [--hub <alias>] [--size <n>] [--def <path> | --snapshot <name>]
+           [--duration <days>] [--interval <minutes>] [--setup-hook] [--no-service]
+claim      [alias] [--cold [--yes]] [--any] [--no-open]
+release    <alias...> | --pool-orgs | --surplus | --stale | --orphans  [--yes]
+uninstall  [--release-pool-orgs] [--yes]
+```
+
+`init` writes only to `<SCRATCHPOOL_HOME>` (config, state, logs) and the per-user scheduler entry (a LaunchAgent, a systemd `--user` timer or a scheduled task); it never writes into your project. `claim` sets the default org with `sf config set target-org`, which `sf` stores in the project's `.sf/` folder.
 
 Every command accepts `--pool <name>` and `--json`. With `--json` (or when stdout is not a TTY) each command prints exactly one `scratchpool/v1` object with documented exit codes; see [docs/SPEC.md](docs/SPEC.md).
 
@@ -99,7 +124,7 @@ Every command accepts `--pool <name>` and `--json`. With `--json` (or when stdou
 One user-level file, `<SCRATCHPOOL_HOME>/config.json` (default `~/.config/scratchpool`, `%APPDATA%\scratchpool` on Windows). Change it from the CLI:
 
 ```sh
-scratchpool config set size 3               # keep 3 warm; the next tick fills (or releases surplus)
+scratchpool config set size 3               # keep 3 warm
 scratchpool config set size 0               # keep nothing warm
 scratchpool config set intervalMinutes 30   # global; reinstalls the service
 ```
@@ -109,25 +134,24 @@ Other keys: `hub`, `definitionFile`, `snapshot`, `durationDays`, `coldDurationDa
 ## How it works
 
 ```mermaid
-flowchart LR
-    subgraph bg["Background: OS scheduler, every 15 min"]
-        T[scratchpool tick] --> R[Reconcile state with sf org list]
-        R --> X[Recycle expired orgs, release surplus]
-        X --> L{Dev Hub limits OK?}
-        L -- yes --> C[sf org create scratch, then setup hook]
-        L -- no --> W[Wait for next tick]
-        C --> P[(Warm pool: ready orgs)]
+flowchart TB
+    subgraph bg["Background: every 15 min"]
+        T[tick] --> R[Reconcile]
+        R --> X[Recycle expired, release surplus]
+        X --> L{Limits OK?}
+        L -- yes --> C[Create org, run setup hook]
+        L -- no --> W[Wait]
+        C --> P[(Warm pool)]
     end
     subgraph fg["Foreground: you or your agent"]
-        U[scratchpool claim PROJ-123] --> Q{Ready org in pool?}
-        Q -- yes --> A[Rename alias, set default org: about 2 s]
-        Q -- no --> E[POOL_EMPTY for agents, or cold create]
+        U[claim PROJ-123] --> Q{Ready org?}
+        Q -- yes --> A[Rename, set default: ~2 s]
+        Q -- no --> E[POOL_EMPTY or cold create]
     end
     P --> Q
-    A -. triggers one refill .-> T
 ```
 
-Each tick takes a per-pool lock and writes state atomically. Allocation limits are checked only before creating, never on the claim path. Scheduler details, file locations and troubleshooting: [docs/background-service.md](docs/background-service.md). For CI, see [docs/ci-auth.md](docs/ci-auth.md).
+A tick reconciles its state with `sf org list`, and each claim starts one refill tick in the background. Each tick takes a per-pool lock and writes state atomically. Allocation limits are checked only before creating, never on the claim path. Scheduler details, file locations and troubleshooting: [docs/background-service.md](docs/background-service.md). For CI, see [docs/ci-auth.md](docs/ci-auth.md).
 
 ## Safety
 
@@ -141,6 +165,25 @@ For agents, also merge [examples/settings.deny.json](examples/settings.deny.json
 ## Limits and sizing
 
 Each pool org holds one active scratch org slot, and each refill uses one daily create, exactly like orgs you create by hand. A Developer Edition Dev Hub allows 3 active and 6 daily, so keep `size` at 1 there. scratchpool keeps an active reserve and a daily floor, and caps its tagged orgs at a share of the hub (`teamCapPct`, default 25%) so one developer's pool can't starve a shared hub. How to pick a size and duration: [docs/pool-sizing.md](docs/pool-sizing.md).
+
+## Uninstall
+
+Remove the scheduler entry before you remove the code, or it keeps running `tick`:
+
+```sh
+scratchpool uninstall                      # remove the scheduler entry; pool orgs stay until they expire
+scratchpool uninstall --release-pool-orgs  # also delete the unclaimed pool orgs (claimed orgs are kept)
+```
+
+Then remove whichever install you used:
+
+```sh
+claude plugin uninstall scratchpool@scratchpool && claude plugin marketplace remove scratchpool
+npx skills remove scratchpool              # add -g if you installed with -g
+npm uninstall -g scratchpool
+```
+
+Config, state and logs stay in `<SCRATCHPOOL_HOME>` (`~/.config/scratchpool`, or `%APPDATA%\scratchpool` on Windows); delete that folder to remove them. Details: [docs/background-service.md](docs/background-service.md#uninstalling).
 
 ## FAQ
 

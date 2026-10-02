@@ -805,7 +805,7 @@
 [43.201, "o", "2"]
 [43.236, "o", "\""]
 [43.486, "o", "\r\n"]
-[44.686, "o", "Your scratch org **DEMO-2** is ready. It came warm from the pool and no browser was opened.\r\n\r\n- **Username:** test-yyyyyyyyyyyy@example.com (org ID 00D000000000000AAA)\r\n- **Time left:** about 2 days 22 hours (it expires 2026-10-05)\r\n- **Setup hook:** ran when the org was built\r\n\r\nThe pool is now empty (0 of 1 ready) and **background filling is paused**, so it won't replace this org on its own. Say the word if you want me to resume filling.\r\n\r\nTo open the org yourself, run `sf org open -o DEMO-2` in your terminal.\r\n"]
+[44.686, "o", "Your scratch org DEMO-2 is ready. It came warm from the pool and no browser was opened.\r\n\r\n- Username: test-yyyyyyyyyyyy@example.com (org ID 00D000000000000AAA)\r\n- Time left: about 2 days 22 hours (it expires 2026-10-05)\r\n- Setup hook: ran when the org was built\r\n\r\nThe pool is now empty (0 of 1 ready) and background filling is paused, so it won't replace this org on its own. Say the word if you want me to resume filling.\r\n\r\nTo open the org yourself, run `sf org open -o DEMO-2` in your terminal.\r\n"]
 [44.94, "o", "\u001b[?25h"]
 [45.34, "o", "\u001b[1;32m~/scratchpool-demo\u001b[0m $ "]
 [45.375, "o", "#"]

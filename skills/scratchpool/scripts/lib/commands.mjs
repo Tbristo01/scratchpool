@@ -143,7 +143,7 @@ function verifyHub(ctx, hub) {
   let hubUsername;
   try { hubUsername = ctx.sf.hubUsername(hub); } catch (e) {
     if (e.code === 'SF_MISSING') throw e;
-    fail('NO_DEVHUB', `"${hub}" is not an authenticated org: ${e.message}. Run \`sf org login web -d -a ${hub}\`.`);
+    fail('NO_DEVHUB', `"${hub}" is not an authenticated org: ${e.message}. Run \`sf org login web --set-default-dev-hub --alias ${hub}\`.`);
   }
   const list = ctx.sf.orgList();
   if (!hubUsername || !list.devHubs.some((h) => h.username === hubUsername)) {
