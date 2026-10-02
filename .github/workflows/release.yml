@@ -83,7 +83,8 @@ jobs:
             echo
             echo '```sh'
             echo "sha256sum -c SHA256SUMS"
-            echo "gh attestation verify scratchpool-skill-${VERSION}.zip --repo ${GITHUB_REPOSITORY}"
+            echo "gh attestation verify scratchpool-skill-${VERSION}.zip --repo ${GITHUB_REPOSITORY} \\"
+            echo "  --signer-workflow ${GITHUB_REPOSITORY}/.github/workflows/release.yml --source-ref ${GITHUB_REF}"
             echo '```'
           } >> "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"

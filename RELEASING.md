@@ -24,7 +24,7 @@ The release workflow publishes the body of the `## [X.Y.Z]` section as the GitHu
 | `package.json` | `version` |
 | `skills/scratchpool/SKILL.md` | `metadata.version` in the frontmatter |
 
-CI checks `package.json` against `plugin.json` on every PR; the release workflow checks all three against the tag.
+CI (`validate manifests`) checks that all three agree on every PR; the release workflow checks them against the tag.
 
 ## 4. Open a PR and merge it
 
@@ -45,7 +45,7 @@ git tag -a vX.Y.Z -m "scratchpool vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Use an annotated tag (`-a`). Once pushed, a `v*` tag cannot be moved or deleted (tag ruleset), so check the commit before pushing.
+Use an annotated tag (`-a`). Once pushed, a `v*` tag is protected by the tag ruleset: it cannot be moved or deleted except by a repository admin bypassing the ruleset, and by policy we never do that for a published release. Check the commit before pushing.
 
 ## 6. Approve the release environment
 
@@ -56,7 +56,7 @@ gh run list --workflow release --limit 1
 gh run view <run-id>   # status "waiting"
 ```
 
-Approve it from the run page (**Review deployments**, tick `release`, **Approve and deploy**). Only approve a run whose tag and commit you just pushed.
+Approve it from the run page (**Review deployments**, tick `release`, **Approve and deploy**). Only approve a run whose tag and commit you just pushed. Admins can bypass this approval; don't.
 
 ## 7. Verify the published release
 
@@ -65,11 +65,13 @@ gh release view vX.Y.Z                         # notes match the CHANGELOG secti
 gh release download vX.Y.Z --dir /tmp/sp-vX.Y.Z
 cd /tmp/sp-vX.Y.Z
 sha256sum -c SHA256SUMS                        # macOS: shasum -a 256 -c SHA256SUMS
-gh attestation verify scratchpool-skill-X.Y.Z.zip --repo Tbristo01/scratchpool
+gh attestation verify scratchpool-skill-X.Y.Z.zip --repo Tbristo01/scratchpool \
+  --signer-workflow Tbristo01/scratchpool/.github/workflows/release.yml \
+  --source-ref refs/tags/vX.Y.Z
 unzip -l scratchpool-skill-X.Y.Z.zip | head    # root is scratchpool/SKILL.md, with LICENSE and NOTICE
 ```
 
-`gh attestation verify` proves the zip was built by this repository's release workflow from the tagged commit, not uploaded by hand.
+With `--signer-workflow` and `--source-ref`, `gh attestation verify` checks that the zip's provenance was signed by this repository's `release.yml` running for the `vX.Y.Z` tag, so it was not built elsewhere or uploaded by hand. (With `--repo` alone it only checks that some workflow in this repository signed it.)
 
 ## If something goes wrong
 

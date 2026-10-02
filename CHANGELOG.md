@@ -12,8 +12,8 @@ The version lives in `.claude-plugin/plugin.json` (mirrored in `package.json`).
 - Skill description: a warm claim takes about two seconds (was "about a second"), matching the measured 1.9 to 2.9 s.
 
 ### Security
-- Release hardening: the release job now runs in the approval-gated `release` environment, attaches a build provenance attestation for the skill zip (`gh attestation verify scratchpool-skill-<v>.zip --repo Tbristo01/scratchpool`), checks the tag against `plugin.json`, `package.json` and `SKILL.md`, and takes its notes from the matching CHANGELOG section.
-- Supply-chain checks: dependency review on PRs (fails on moderate or higher advisories and non-Apache-compatible runtime licenses), OpenSSF Scorecard with a README badge, CODEOWNERS, and grouped weekly Dependabot updates for pinned actions.
+- Release hardening: the release job now runs in the approval-gated `release` environment, attaches a build provenance attestation for the skill zip (verify with `gh attestation verify` and `--signer-workflow`/`--source-ref`, see `RELEASING.md`), checks the tag against `plugin.json`, `package.json` and `SKILL.md` (CI now checks `SKILL.md` too), and takes its notes from the matching CHANGELOG section.
+- Supply-chain checks: an advisory dependency review check on PRs (fails on moderate or higher advisories in any dependency scope and on non-Apache-compatible runtime licenses; not a required check), OpenSSF Scorecard with a README badge, CODEOWNERS, and grouped weekly Dependabot updates for pinned actions.
 - CI: every job has a timeout, and a new push to a PR cancels that PR's superseded run (runs on `main` are never cancelled).
 
 ### Documentation

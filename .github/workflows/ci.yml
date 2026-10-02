@@ -135,7 +135,7 @@ jobs:
             if (existsSync("bin")) fail("no top-level bin/ directory (claude.ai org sync rejects it)");
             console.log(`ok: ${plugin.name}@${plugin.version}`);
           '
-      - name: Validate SKILL.md frontmatter name
+      - name: Validate SKILL.md frontmatter name and version
         shell: bash
         run: |
           f=skills/scratchpool/SKILL.md
@@ -143,4 +143,11 @@ jobs:
           head -1 "$f" | grep -qx -- '---'
           grep -qE '^name: *scratchpool *$' "$f"
           grep -qE '^description: *.+' "$f"
-          echo "ok: $f"
+          # Same check the release workflow makes against the tag, run here so a mismatch is caught
+          # before a (protected, unmovable) v* tag is pushed.
+          version=$(node -p 'require("./.claude-plugin/plugin.json").version')
+          if ! grep -qE "^  version: \"${version//./\\.}\"\$" "$f"; then
+            echo "::error::$f metadata.version is not \"${version}\" (plugin.json)"
+            exit 1
+          fi
+          echo "ok: $f (version ${version})"
