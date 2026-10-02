@@ -189,7 +189,8 @@ test('cronShQuote: newlines and other control characters are rejected', () => {
 
 test('crontab: the previous "%" -> "\\%" escaping broke on a backslash before %', () => {
   // Old: shQuote(v).replace(/%/g, '\\%'). For v = "/tmp/a\%b" cron sees "\\" as a pair and the % unescaped.
-  const old = `'/tmp/a\\%b'`.replace(/%/g, '\\%');
+  // What it produced, written out literally: '/tmp/a\\%b' (backslash, backslash, percent).
+  const old = "'/tmp/a" + '\\' + '\\' + "%b'";
   assert.notEqual(cronUnescape(`echo ${old}`).stdin, null, 'the old escaping lets cron cut the command');
   assert.equal(cronUnescape(`echo ${cronShQuote('/tmp/a\\%b')}`).stdin, null, 'the new escaping does not');
 });
