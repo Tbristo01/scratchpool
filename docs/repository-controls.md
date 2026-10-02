@@ -7,7 +7,7 @@ Some settings are on the repository rather than in files, so they can drift. If 
 | Control | Where | What it prevents | How to verify |
 |---|---|---|---|
 | **Branch protection on `main`** | Repo settings | Any change reaching `main` except through a pull request, including the maintainer's (a PR is required, with 0 required approvals while there is one maintainer); direct pushes, force pushes and deletion of `main`; merge commits (linear history); merging with unresolved review conversations. Enforced for admins too (`enforce_admins`), so no one can bypass it without first changing the setting, which is audit-logged. | `gh api repos/$R/branches/main/protection --jq '{pr_required: (.required_pull_request_reviews != null), approvals: .required_pull_request_reviews.required_approving_review_count, enforce_admins: .enforce_admins.enabled, linear: .required_linear_history.enabled, force: .allow_force_pushes.enabled, delete: .allow_deletions.enabled, conversations: .required_conversation_resolution.enabled}'` (expect `true`, `0`, `true`, `true`, `false`, `false`, `true`) |
-| **Required status checks** | Repo settings, [ci.yml](../.github/workflows/ci.yml), [dependency-review.yml](../.github/workflows/dependency-review.yml), code scanning | Merging a PR unless all 11 checks pass on a branch that is up to date with `main` (strict): `test (ubuntu-latest, node 20)`, `test (ubuntu-latest, node 22)`, `test (macos-latest, node 20)`, `test (macos-latest, node 22)`, `test (windows-latest, node 20)`, `test (windows-latest, node 22)`, `validate manifests`, `secret-pattern scan`, `shellcheck examples` (the 9 [ci.yml](../.github/workflows/ci.yml) jobs), `dependency review` ([dependency-review.yml](../.github/workflows/dependency-review.yml)) and `CodeQL` (code scanning). Job names are the check names, so renaming a CI job silently drops a required check; don't. | `gh api repos/$R/branches/main/protection/required_status_checks --jq '{strict, n: (.checks \| length), contexts: [.checks[].context]}'` (expect `strict: true`, `n: 11`) |
+| **Required status checks** | Repo settings, [ci.yml](../.github/workflows/ci.yml), [dependency-review.yml](../.github/workflows/dependency-review.yml), code scanning | Merging a PR unless all 11 checks pass on a branch that is up to date with `main` (strict): `test (ubuntu-latest, node 20)`, `test (ubuntu-latest, node 22)`, `test (macos-latest, node 20)`, `test (macos-latest, node 22)`, `test (windows-latest, node 20)`, `test (windows-latest, node 22)`, `validate manifests`, `secret-pattern scan`, `shellcheck examples` (the 9 [ci.yml](../.github/workflows/ci.yml) jobs), `dependency review` ([dependency-review.yml](../.github/workflows/dependency-review.yml)) and `CodeQL` (code scanning). Job names are the check names, so renaming a CI job silently drops a required check; don't. Each check is also tied to the app that must report it: `15368` (GitHub Actions) for the 10 workflow checks and `57789` (GitHub Advanced Security, CodeQL) for `CodeQL`, so a status with the same name posted by anyone else does not satisfy it. | `gh api repos/$R/branches/main/protection/required_status_checks --jq '{strict, n: (.checks \| length), checks: [.checks[] \| {context, app_id}]}'` (expect `strict: true`, `n: 11`, and those app ids; an `app_id: null` means any source can satisfy that check and is a regression) |
 | **Squash-only merges** | Repo settings | Merge commits and rebase merges. Every PR lands as one squash commit that GitHub creates and signs with its own key, so it satisfies the signed-commit requirement whether or not the contributor signed their commits. Merged branches are deleted. | `gh api repos/$R --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, delete_branch_on_merge}'` (expect `true`, `false`, `false`, `true`) |
 | **CI hygiene** | [ci.yml](../.github/workflows/ci.yml) | Hung jobs burning minutes (every job has `timeout-minutes`); stale PR runs (a new push cancels the PR's superseded run). Pushes to `main` are never cancelled, so every commit on `main` has a full CI record. | `grep -n 'timeout-minutes\|concurrency' -A2 .github/workflows/ci.yml` |
 | **Tag ruleset** | Repo rulesets ("protect release tags") | Moving, force-updating or deleting a `v*` tag after it is pushed, so a published release always points at the commit it was built from. The ruleset has no bypass actors: not even a repository admin can move or delete a release tag without first editing the ruleset (audit-logged). | `gh api repos/$R/rulesets --jq '.[] \| {id, name, target, enforcement}'` then `gh api repos/$R/rulesets/<id> --jq '{enforcement, conditions, rules: [.rules[].type], bypass_actors}'` (expect `active`, `refs/tags/v*`, `deletion`/`non_fast_forward`/`update`, `bypass_actors: []`) |
@@ -30,7 +30,7 @@ Some settings are on the repository rather than in files, so they can drift. If 
 
 ## Proof
 
-The settings above are enforced, not just configured. On 2026-10-02 a direct push to `main` by the repository admin was rejected by GitHub:
+The settings above are enforced, not just configured. As a one-time observation (a rejected push leaves nothing the API can show afterwards), on 2026-10-02 a direct push to `main` by the repository admin was rejected by GitHub:
 
 ```text
 remote: error: GH006: Protected branch update failed for refs/heads/main.
@@ -38,18 +38,18 @@ remote: - Changes must be made through a pull request.
 remote: - Commits must have verified signatures.
 ```
 
-To re-check every enforced setting in one go:
+That transcript cannot be re-checked later; the commands below can. To re-check every enforced setting in one go:
 
 ```sh
 R=Tbristo01/scratchpool
-gh api repos/$R/branches/main/protection --jq '{enforce_admins: .enforce_admins.enabled, required_signatures: .required_signatures.enabled, pr_required: (.required_pull_request_reviews != null), linear: .required_linear_history.enabled, conversations: .required_conversation_resolution.enabled, strict: .required_status_checks.strict, checks: [.required_status_checks.checks[].context]}'
+gh api repos/$R/branches/main/protection --jq '{enforce_admins: .enforce_admins.enabled, required_signatures: .required_signatures.enabled, pr_required: (.required_pull_request_reviews != null), linear: .required_linear_history.enabled, conversations: .required_conversation_resolution.enabled, strict: .required_status_checks.strict, checks: [.required_status_checks.checks[] | {context, app_id}]}'
 gh api repos/$R --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge}'
 gh api repos/$R/environments/release --jq .can_admins_bypass
 gh api repos/$R/rulesets --jq '.[] | select(.target == "tag") | .id' | xargs -I{} gh api repos/$R/rulesets/{} --jq '{enforcement, bypass_actors}'
 gh api repos/$R/actions/permissions --jq .sha_pinning_required
 ```
 
-Expected: `enforce_admins`, `required_signatures`, `pr_required`, `linear`, `conversations` and `strict` all `true` with the 11 checks listed above; squash only; `false` for `can_admins_bypass`; `active` with `bypass_actors: []`; `true` for SHA pinning.
+Expected: `enforce_admins`, `required_signatures`, `pr_required`, `linear`, `conversations` and `strict` all `true` with the 11 checks listed above, each with its `app_id` (`15368`, or `57789` for `CodeQL`; never `null`); squash only; `false` for `can_admins_bypass`; `active` with `bypass_actors: []`; `true` for SHA pinning.
 
 ## What these controls do not cover
 

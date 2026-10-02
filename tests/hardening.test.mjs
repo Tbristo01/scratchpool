@@ -228,7 +228,7 @@ test('sf binary in a directory with spaces (exercises the cmd.exe quoting on Win
   } finally { t.cleanup(); }
 });
 
-test('cmd.exe escaping: the command token stays one token; arguments are quoted then caret-escaped once per cmd parse', () => {
+test('cmd.exe escaping: the command token stays one token; arguments are quoted then caret-escaped for the first two cmd parses', () => {
   assert.equal(winEscapeCommand('C:\\Program Files\\sf\\bin\\sf.cmd'), 'C:\\Program^ Files\\sf\\bin\\sf.cmd');
   assert.equal(winQuote('a b&c', 1), '^"a^ b^&c^"');
   assert.equal(winQuote('a b&c'), '^^^"a^^^ b^^^&c^^^"');

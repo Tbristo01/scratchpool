@@ -25,7 +25,7 @@ serviceStatus({home, platform, dryRun})                                         
 
 - One zero-dependency ES module: `skills/scratchpool/scripts/scratchpool.mjs` (Node >= 20, built-ins only; may be split into `scripts/lib/*.mjs` if > ~900 lines, still zero deps).
 - Also exposed as a CLI (`npx github:Tbristo01/scratchpool`; not on the npm registry) via `package.json` `"bin": {"scratchpool": "skills/scratchpool/scripts/scratchpool.mjs"}` (shebang `#!/usr/bin/env node`).
-- Talks to Salesforce ONLY by spawning the `sf` CLI with `--json`, using arg arrays (never a shell string). On Windows, resolve `sf.cmd` and spawn it through `cmd.exe /d /s /c` with cross-spawn-style escaping (command token caret-escaped, each argument quoted then caret-escaped).
+- Talks to Salesforce ONLY by spawning the `sf` CLI with `--json`, using arg arrays (never a shell string). On Windows, resolve `sf.cmd` and spawn it through `cmd.exe /d /v:off /s /c` with cross-spawn-style escaping (command token caret-escaped, each argument quoted then caret-escaped twice). cmd may re-parse the arguments more than twice (the official installer's `sf.cmd` chains to `%LOCALAPPDATA%\sf\client\bin\sf.cmd`), so any argument or `sf` path containing `"`, `%` or a control character is refused with `USAGE`. Limit: the `sf` install path and the definition file's path relative to the project (the `-f` value; `sf` runs with cwd = projectDir) must not contain `%`; the project folder itself may.
 - Platform scheduler integration: macOS launchd LaunchAgent, Linux systemd `--user` timer (fallback: print a crontab line), Windows Task Scheduler (`schtasks`).
 
 ## 2. Commands

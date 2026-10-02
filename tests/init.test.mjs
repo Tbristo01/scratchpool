@@ -49,7 +49,9 @@ test('init: resolves default hub, writes config with absolute paths, runs one ti
 
     const create = t.ran('org create scratch')[0];
     assert.ok(create.argv.includes('-f'));
-    assert.equal(create.argv[create.argv.indexOf('-f') + 1], path.join(t.project, 'config/project-scratch-def.json'));
+    // Relative to the project (sf runs with cwd = project), so the project path never reaches cmd.exe on Windows.
+    assert.equal(create.argv[create.argv.indexOf('-f') + 1], path.join('config', 'project-scratch-def.json'));
+    assert.equal(path.resolve(create.cwd, create.argv[create.argv.indexOf('-f') + 1]), path.join(t.project, 'config/project-scratch-def.json'));
     assert.equal(create.argv[create.argv.indexOf('-v') + 1], 'devhub');
     assert.equal(create.argv[create.argv.indexOf('-y') + 1], '7');
     assert.match(create.argv[create.argv.indexOf('--description') + 1], /^scratchpool:v1:me@corp\.com:[0-9a-f]{12}:[0-9a-f]{8}$/);
@@ -91,6 +93,21 @@ test('init: NO_DEVHUB when the alias is not a Dev Hub', () => {
     t.setScenario({ scratchOrgs: [{ alias: 'so', username: 'so@x.com', orgId: '00D1', expirationDate: '2026-10-08', devHubUsername: 'me@corp.com' }] });
     const r2 = t.run(['init', '--hub', 'so', '--no-service', '--json']);
     assert.equal(r2.json.error.code, 'NO_DEVHUB');
+  } finally { t.cleanup(); }
+});
+
+test('init: --hub and config set hub accept only an sf alias or username; nothing is spawned for a bad one', () => {
+  const t = makeEnv();
+  try {
+    for (const bad of ['x" & calc & "', 'a\\"&calc&\\"', '%COMSPEC%', '-o', 'dev hub', 'a&b', 'a\nb']) {
+      const r = t.run(['init', '--hub', bad, '--no-service', '--json']);
+      assert.equal(r.json?.error?.code, 'USAGE', `${JSON.stringify(bad)}: ${r.stdout}${r.stderr}`);
+    }
+    assert.equal(t.ran('org display').length, 0, 'sf org display never ran with a bad hub');
+    const ok = t.run(['init', '--hub', 'devhub', '--size', '0', '--no-service', '--json']);
+    assert.equal(ok.code, 0, ok.stdout + ok.stderr);
+    const r = t.run(['config', 'set', 'hub', 'a"&calc', '--json']);
+    assert.equal(r.json.error.code, 'USAGE', r.stdout);
   } finally { t.cleanup(); }
 });
 

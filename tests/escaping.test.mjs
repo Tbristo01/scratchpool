@@ -63,9 +63,12 @@ function msvcrtSplit(s) {
   return args;
 }
 
-// cmd /d /v:off /s /c "<line>" running the shim `node "%~dp0sf" %*` (tests/stub/sf.cmd, the npm/oclif shape):
-// parse 1 is cmd /c, parse 2 is the shim's own line after %* is substituted. Returns what node sees as argv.
-function throughCmdAndShim(bin, args) {
+// cmd /d /v:off /s /c "<line>" running a chain of batch shims. Parse 1 is cmd /c; every later parse is a
+// shim's own line after %* is substituted. With `parses` = 2 that is the npm shape (`node "%~dp0sf" %*`,
+// tests/stub/sf.cmd); with 3 it is the official installer's oclif sf.cmd, which passes %* on to
+// %LOCALAPPDATA%\sf\client\bin\sf.cmd, which passes %* to node. Returns what node sees as argv.
+// The cmd line itself and the lines a shim builds around %* are what a parse-N model takes.
+function throughCmdShims(bin, args, parses = 2) {
   const argv = winCmdArgv(bin, args);
   const line = argv[4];
   assert.ok(line.startsWith('"') && line.endsWith('"'), '/s strips one outer quote pair');
@@ -73,9 +76,17 @@ function throughCmdAndShim(bin, args) {
   const p1 = cmdPhase2(line.slice(1, -1));
   assert.deepEqual(p1.bare, [], `parse 1 has no bare operator: ${line}`);
   assert.ok(p1.out.startsWith(bin + ' '), `the command token survives as one token: ${p1.out}`);
-  const p2 = cmdPhase2(`node "C:\\stub\\sf" ${p1.out.slice(bin.length + 1)}`);
-  assert.deepEqual(p2.bare, [], `parse 2 (the shim's %*) has no bare operator: ${p2.out}`);
-  return msvcrtSplit(p2.out).slice(2);
+  let rest = p1.out.slice(bin.length + 1);
+  for (let n = 2; n < parses; n++) {
+    const prefix = '"C:\\Users\\me\\AppData\\Local\\sf\\client\\bin\\sf.cmd" ';
+    const pn = cmdPhase2(prefix + rest);
+    assert.deepEqual(pn.bare, [], `parse ${n} (a chained shim's %*) has no bare operator: ${pn.out}`);
+    rest = pn.out.slice(prefix.length);
+  }
+  const prefix = 'node "C:\\stub\\sf" ';
+  const last = cmdPhase2(prefix + rest);
+  assert.deepEqual(last.bare, [], `parse ${parses} (the last shim's %*) has no bare operator: ${last.out}`);
+  return msvcrtSplit(last.out).slice(2);
 }
 
 // cronie / Vixie do_command: "\%" -> "%", "\x" kept as a pair, and an unescaped % ends the command.
@@ -95,23 +106,29 @@ function cronUnescape(cmd) {
 // ------------------------------------------------------------------ corpora
 
 const HOSTILE_ARGS = [
-  'a&calc', 'x|whoami', '<in', '>out', 'a>>b', '2>&1', '^', '^^&', '!PATH!', '!', '"', 'a"b', '""',
-  'a\\"&calc&\\"', '"&calc&"', '\\', 'trailing\\', 'tr\\\\', '\\\\server\\share', "it's", "'\"'\"'", '(x)', ')&(',
-  'a b  c', '', ' ', ';,=', '`whoami`', '$(id)', '*?[]', '&&', '||', 'a^"&calc',
+  'a&calc', 'x|whoami', '<in', '>out', 'a>>b', '2>&1', '^', '^^&', '!PATH!', '!', "a'b", '^&calc',
+  '\\', 'trailing\\', 'tr\\\\', '\\\\server\\share', "it's", "'''", '(x)', ')&(', ') & calc & (', '^)&calc&^(',
+  'a b  c', '', ' ', ';,=', '`whoami`', '$(id)', '*?[]', '&&', '||', 'a^^&calc', 'a\\^&calc',
   'C:\\Program Files (x86)\\proj & co\\config\\project-scratch-def.json', 'me+test@x.com', 'my.alias-1_2',
   "SELECT Id, SignupUsername, Description, ExpirationDate, Status, CreatedDate FROM ScratchOrgInfo WHERE Status = 'Active'",
   'scratchpool:v1:me@corp.com:abc123:m1', 'alias=user@x.com', 'ünïcødé ✓',
 ];
-const REJECTED_ARGS = ['%PATH%', '%PATH:x=y%', '%', '50%', 'a\nb', 'a\r\nb&calc', 'a\rb', 'a\0b', 'a\tb', '\u007f', '\u001b[31m'];
+const REJECTED_ARGS = [
+  '%PATH%', '%PATH:x=y%', '%', '50%', 'a\nb', 'a\r\nb&calc', 'a\rb', 'a\0b', 'a\tb', '\u007f', '\u001b[31m',
+  // '"' is refused so that no argument can toggle cmd's quote mode in any parse after the escaped ones.
+  '"', 'a"b', '""', 'a\\"&calc&\\"', '"&calc&"', 'x" & calc & "', "'\"'\"'", 'a^"&calc', 'C:\\a"b\\c',
+];
 
 // ------------------------------------------------------------------ Windows cmd.exe (pure, all OSes)
 
-test('cmd.exe line: every hostile argument reaches node byte-for-byte with no bare operator in either parse', () => {
-  for (const bin of ['C:\\sf\\bin\\sf.cmd', 'C:\\Program Files (x86)\\sf & co\\bin\\sf.cmd']) {
-    for (const a of HOSTILE_ARGS) {
-      assert.deepEqual(throughCmdAndShim(bin, ['org', 'list', a]), ['org', 'list', a], JSON.stringify(a));
+test('cmd.exe line: every hostile argument reaches node byte-for-byte with no bare operator in any parse (2, 3 or 4)', () => {
+  for (const parses of [2, 3, 4]) {
+    for (const bin of ['C:\\sf\\bin\\sf.cmd', 'C:\\Program Files (x86)\\sf & co\\bin\\sf.cmd']) {
+      for (const a of HOSTILE_ARGS) {
+        assert.deepEqual(throughCmdShims(bin, ['org', 'list', a], parses), ['org', 'list', a], `${parses} parses: ${JSON.stringify(a)}`);
+      }
+      assert.deepEqual(throughCmdShims(bin, HOSTILE_ARGS, parses), HOSTILE_ARGS, `${parses} parses: all at once`);
     }
-    assert.deepEqual(throughCmdAndShim(bin, HOSTILE_ARGS), HOSTILE_ARGS, 'all at once');
   }
 });
 
@@ -120,26 +137,49 @@ test('cmd.exe line: % and control characters (CR, LF, NUL, TAB, ESC, DEL) are re
     assert.throws(() => winQuote(a), (e) => e.code === 'USAGE' && /cmd\.exe/.test(e.message), JSON.stringify(a));
     assert.throws(() => winCmdArgv('C:\\sf\\sf.cmd', ['org', 'list', a]), (e) => e.code === 'USAGE', JSON.stringify(a));
   }
-  for (const bin of ['C:\\100%\\sf.cmd', 'C:\\%TEMP%\\sf.cmd', 'C:\\a\nb\\sf.cmd', 'C:\\a\rcalc\\sf.cmd']) {
+  for (const bin of ['C:\\100%\\sf.cmd', 'C:\\%TEMP%\\sf.cmd', 'C:\\a\nb\\sf.cmd', 'C:\\a\rcalc\\sf.cmd', 'C:\\a"&calc&"\\sf.cmd']) {
     assert.throws(() => winEscapeCommand(bin), (e) => e.code === 'USAGE', JSON.stringify(bin));
   }
 });
 
-test('cmd.exe line: a single caret layer (the previous escaping) lets the shim re-parse break out of quotes', () => {
-  // Why arguments are escaped twice: with one layer, a \" inside an argument closes cmd's quote mode in the
-  // shim's %* line and the & after it runs as a second command.
-  const once = `"${winEscapeCommand('C:\\sf\\sf.cmd')} ${winQuote('a\\"&calc&\\"', 1)}"`;
-  const p1 = cmdPhase2(once.slice(1, -1));
+test('cmd.exe line: escaping a \" for a fixed number of parses breaks on one more parse (why \" is refused)', () => {
+  // What the two-layer escaping that allowed '"' produced for a\"&calc&\", written out literally:
+  //   ^^^"a\\\^^^"^^^&calc^^^&\\\^^^"^^^"
+  // It survives the cmd /c parse and the shim's %*, but the oclif sf.cmd chain parses %* a third time,
+  // where the unescaped \" ends quote mode and both & run as command separators.
+  const twice = String.raw`^^^"a\\\^^^"^^^&calc^^^&\\\^^^"^^^"`;
+  const p1 = cmdPhase2(`C:\\sf\\sf.cmd ${twice}`);
   assert.deepEqual(p1.bare, []);
-  assert.deepEqual(cmdPhase2(`node "C:\\stub\\sf" ${p1.out.slice('C:\\sf\\sf.cmd '.length)}`).bare, ['&', '&']);
+  const p2 = cmdPhase2(`"C:\\client\\sf.cmd" ${p1.out.slice('C:\\sf\\sf.cmd '.length)}`);
+  assert.deepEqual(p2.bare, []);
+  assert.deepEqual(cmdPhase2(`node "C:\\stub\\sf" ${p2.out.slice('"C:\\client\\sf.cmd" '.length)}`).bare, ['&', '&']);
+  // Now the argument is refused before any line is built.
+  assert.throws(() => winQuote('a\\"&calc&\\"'), (e) => e.code === 'USAGE');
 });
 
 test('cmd.exe line: Sf.raw refuses a hostile argument before spawning anything', { skip: process.platform !== 'win32' }, () => {
   assert.throws(() => new Sf(STUB).raw(['org', 'list', '%COMSPEC%']), (e) => e.code === 'USAGE');
   assert.throws(() => new Sf(STUB).raw(['org', 'list', 'a\r\nwhoami']), (e) => e.code === 'USAGE');
+  assert.throws(() => new Sf(STUB).raw(['org', 'list', 'x" & calc & "']), (e) => e.code === 'USAGE');
 });
 
-test('cmd.exe line (real cmd.exe + stub sf.cmd): hostile arguments arrive intact', { skip: process.platform !== 'win32' }, () => {
+// The official Salesforce CLI installer's shape (oclif): <install>\bin\sf.cmd runs the client's sf.cmd with %*
+// when it exists, and that one runs node with %* again, so cmd parses the arguments three times.
+function oclifChain(dir) {
+  const outer = path.join(dir, 'Program Files (x86)', 'sf & co', 'bin', 'sf.cmd');
+  const inner = path.join(dir, 'client', 'bin', 'sf.cmd');
+  fs.mkdirSync(path.dirname(outer), { recursive: true });
+  fs.mkdirSync(path.dirname(inner), { recursive: true });
+  const stubJs = path.join(path.dirname(STUB), 'sf');
+  fs.writeFileSync(outer, [
+    '@echo off', 'setlocal enableextensions', '',
+    `if exist "${inner}" (`, `  "${inner}" %*`, ') else (', `  node "${stubJs}" %*`, ')', '',
+  ].join('\r\n'));
+  fs.writeFileSync(inner, ['@echo off', 'setlocal enableextensions', '', `node "${stubJs}" %*`, ''].join('\r\n'));
+  return outer;
+}
+
+test('cmd.exe line (real cmd.exe + stub sf.cmd, and an oclif-shaped chained sf.cmd): hostile arguments arrive intact', { skip: process.platform !== 'win32' }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-esc-'));
   const scenario = path.join(dir, 'scenario.json');
   fs.writeFileSync(scenario, JSON.stringify({ version: '2.150.0' }));
@@ -147,11 +187,16 @@ test('cmd.exe line (real cmd.exe + stub sf.cmd): hostile arguments arrive intact
   process.env.SCRATCHPOOL_STUB_SCENARIO = scenario;
   try {
     const marker = path.join(dir, 'pwned');
-    const args = ['org', 'list', ...HOSTILE_ARGS, `x" & echo pwned > "${marker}`, `x\\" & echo pwned > ${marker} & \\"`];
-    new Sf(STUB).raw(args);
-    const calls = fs.readFileSync(scenario + '.calls.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-    assert.deepEqual(calls.at(-1).argv, args);
-    assert.ok(!fs.existsSync(marker), 'no injected command ran');
+    const args = ['org', 'list', ...HOSTILE_ARGS, `x & echo pwned > ${marker}`, `x) & echo pwned > ${marker} & (`, `^) ^& echo pwned ^> ${marker}`];
+    for (const bin of [STUB, oclifChain(dir)]) {
+      new Sf(bin).raw(args);
+      const calls = fs.readFileSync(scenario + '.calls.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+      assert.deepEqual(calls.at(-1).argv, args, bin);
+      assert.ok(!fs.existsSync(marker), `no injected command ran via ${bin}`);
+      // A quote is refused before anything is spawned, whatever the shim chain.
+      assert.throws(() => new Sf(bin).raw(['org', 'list', `x" & echo pwned > "${marker}`]), (e) => e.code === 'USAGE');
+      assert.ok(!fs.existsSync(marker));
+    }
   } finally {
     if (prev === undefined) delete process.env.SCRATCHPOOL_STUB_SCENARIO; else process.env.SCRATCHPOOL_STUB_SCENARIO = prev;
     fs.rmSync(dir, { recursive: true, force: true });
