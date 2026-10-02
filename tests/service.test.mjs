@@ -25,6 +25,7 @@ afterEach(() => {
 const dry = (h) => path.join(h, 'service-dryrun');
 const readCommands = (h) => JSON.parse(fs.readFileSync(path.join(dry(h), 'commands.json'), 'utf8'));
 const read = (f) => fs.readFileSync(f, 'utf8');
+const currentUid = () => (typeof process.getuid === 'function' ? process.getuid() : 0);
 
 const posixPaths = {
   nodePath: '/Users/Jane Doe/.nvm/versions/node/v22.0.0/bin/node',
@@ -43,7 +44,9 @@ describe('darwin (launchd)', () => {
     assert.equal(r.platform, 'darwin');
     const plist = path.join(dry(home), 'dev.scratchpool.tick.plist');
     assert.deepEqual(r.files, [plist]);
-    const uid = process.getuid();
+    // process.getuid() does not exist on Windows; service.mjs falls back to uid 0 there (the plist is still
+    // generated, e.g. for a dry run), so the expected commands use the same fallback.
+    const uid = currentUid();
     assert.deepEqual(r.commands, [
       ['launchctl', 'bootout', `gui/${uid}/dev.scratchpool.tick`],
       ['launchctl', 'bootstrap', `gui/${uid}`, plist],
@@ -110,7 +113,7 @@ describe('darwin (launchd)', () => {
     const u = uninstallService({ home, platform: 'darwin' });
     assert.equal(u.installed, false);
     assert.deepEqual(u.files, [path.join(dry(home), 'dev.scratchpool.tick.plist')]);
-    assert.deepEqual(u.commands, [['launchctl', 'bootout', `gui/${process.getuid()}/dev.scratchpool.tick`]]);
+    assert.deepEqual(u.commands, [['launchctl', 'bootout', `gui/${currentUid()}/dev.scratchpool.tick`]]);
     assert.equal(serviceStatus({ home, platform: 'darwin' }).installed, false);
     // uninstall twice is harmless
     assert.deepEqual(uninstallService({ home, platform: 'darwin' }).files, []);
@@ -164,7 +167,11 @@ describe('linux (systemd --user)', () => {
     const words = [...exec.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => _internal.systemdUnquote(`"${m[1]}"`));
     assert.deepEqual(words, [posixPaths.nodePath, base().scriptPath]);
     assert.match(service, /^Environment="PATH=\/Users\/Jane Doe\/\.nvm\/versions\/node\/v22\.0\.0\/bin:\/opt\/sf cli\/bin:\/usr\/bin:\/bin"$/m);
-    assert.ok(service.includes(`Environment="SCRATCHPOOL_HOME=${path.resolve(home)}"`));
+    // systemd C-style escaping doubles backslashes (a Windows temp home such as C:\Users\... has them).
+    const quotedHome = path.resolve(home).replace(/\\/g, '\\\\');
+    assert.ok(service.includes(`Environment="SCRATCHPOOL_HOME=${quotedHome}"`));
+    const envHome = /^Environment=("SCRATCHPOOL_HOME=.*")$/m.exec(service)[1];
+    assert.equal(_internal.systemdUnquote(envHome), `SCRATCHPOOL_HOME=${path.resolve(home)}`);
   });
 
   test('re-install is idempotent', () => {

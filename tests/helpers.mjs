@@ -16,7 +16,9 @@ export const SECRET_PATTERNS = [/force:\/\//, /FAKEACCESS/, /FAKEREFRESH/, /5Aep
   /sfdxAuthUrl/i, /frontdoor/i, /sid=/, /00DFAKE/, /LEAK/];
 
 export function makeEnv(opts = {}) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sp-test-')));
+  // .native resolves Windows 8.3 short names (C:\Users\RUNNER~1 -> runneradmin) exactly as the CLI's
+  // realpath() does; the JS fs.realpathSync leaves them, so expected and actual paths would differ.
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'sp-test-')));
   const home = path.join(root, 'home');
   const project = path.join(root, opts.projectName || 'my-app');
   fs.mkdirSync(path.join(project, 'config'), { recursive: true });
