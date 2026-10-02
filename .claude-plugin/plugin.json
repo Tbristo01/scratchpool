@@ -1,0 +1,14 @@
+{
+  "name": "scratchpool",
+  "displayName": "scratchpool",
+  "version": "0.1.0",
+  "description": "A warm pool of ready Salesforce scratch orgs, managed locally on your own machine with your own Dev Hub: claim a pre-built, pre-configured org in seconds instead of waiting for a cold create plus setup. No server.",
+  "author": {
+    "name": "Tishaun Bristol",
+    "url": "https://github.com/Tbristo01"
+  },
+  "homepage": "https://github.com/Tbristo01/scratchpool#readme",
+  "repository": "https://github.com/Tbristo01/scratchpool",
+  "license": "Apache-2.0",
+  "keywords": ["salesforce", "scratch-org", "sfdx", "sf-cli", "dev-hub", "pool", "skill"]
+}

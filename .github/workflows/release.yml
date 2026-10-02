@@ -1,0 +1,70 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# Every action is pinned to a full commit SHA (release tag in the trailing comment).
+# Tests run in a read-only job; only the release job, which runs no project code, can write.
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Run tests
+        env:
+          SCRATCHPOOL_SERVICE_DRYRUN: "1"
+        run: npm test
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub Release and upload assets
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Check tag matches plugin.json version
+        id: ver
+        shell: bash
+        run: |
+          version=$(node -p 'require("./.claude-plugin/plugin.json").version')
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match plugin.json version ${version}"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Build skill zip and SHA256SUMS
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p dist stage
+          # Zip root is the skill folder itself (scratchpool/SKILL.md), as claude.ai skill upload expects.
+          # LICENSE and NOTICE travel with the skill (Apache-2.0 section 4).
+          cp -R skills/scratchpool stage/scratchpool
+          cp LICENSE NOTICE stage/scratchpool/
+          (cd stage && zip -r -X "../dist/scratchpool-skill-${VERSION}.zip" scratchpool -x '*.DS_Store')
+          (cd dist && sha256sum ./*.zip | sed 's# \./# #' > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "dist/scratchpool-skill-${VERSION}.zip" dist/SHA256SUMS \
+            --verify-tag --title "scratchpool ${GITHUB_REF_NAME}" --generate-notes

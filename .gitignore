@@ -1,0 +1,37 @@
+# dependencies (scratchpool has none; keep stray installs out)
+node_modules/
+
+# build and release output
+dist/
+*.zip
+*.tgz
+SHA256SUMS
+
+# test scratch and local scratchpool homes
+.tmp/
+tmp/
+coverage/
+service-dryrun/
+.scratchpool-home/
+
+# Salesforce CLI local state (auth lives here; never commit it)
+.sf/
+.sfdx/
+
+# secrets and env
+.env
+.env.*
+*.key
+*.pem
+server.key
+
+# logs
+*.log
+logs/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

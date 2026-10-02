@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in scratchpool behaves differently from docs/SPEC.md.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Never paste tokens, auth URLs, `sf org display --verbose` output, or `SF_TEMP_SHOW_SECRETS` output.**
+        scratchpool's own `--json` output is safe to paste; it is built from an allowlist. Usernames and org IDs may be replaced with placeholders.
+        Security problems go to private vulnerability reporting, not here.
+  - type: input
+    id: version
+    attributes:
+      label: scratchpool version
+      description: Output of `scratchpool --version` (or the release / commit you installed)
+    validations:
+      required: true
+  - type: input
+    id: sf
+    attributes:
+      label: sf CLI version
+      description: Output of `sf --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Linux (systemd --user), Linux (cron fallback), Windows, Other]
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: Output of `node --version`
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install path
+      options: [Claude Code plugin, npx skills add, "npx github:Tbristo01/scratchpool", git clone, claude.ai skill zip, Other]
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The exact command, and its `--json` output (redact usernames if you like).
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: "`scratchpool status --json` and the last lines of the log"
+      description: The log is `<SCRATCHPOOL_HOME>/logs/scratchpool.log` (messages are already scrubbed).
+      render: shell

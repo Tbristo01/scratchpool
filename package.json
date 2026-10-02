@@ -1,0 +1,38 @@
+{
+  "name": "scratchpool",
+  "version": "0.1.0",
+  "description": "A warm pool of ready Salesforce scratch orgs that lives on your own machine: claim one in seconds, the OS scheduler refills it with your own Dev Hub. No server, zero dependencies; wraps the sf CLI.",
+  "type": "module",
+  "bin": {
+    "scratchpool": "skills/scratchpool/scripts/scratchpool.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "files": [
+    "skills/",
+    "docs/*.md",
+    "docs/demo/*.svg",
+    "examples/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE",
+    "CREDITS.md",
+    "SECURITY.md"
+  ],
+  "keywords": ["salesforce", "scratch-org", "sfdx", "sf", "dev-hub", "pool", "agent-skill", "claude-code"],
+  "author": "Tishaun Bristol",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tbristo01/scratchpool.git"
+  },
+  "homepage": "https://github.com/Tbristo01/scratchpool#readme",
+  "bugs": {
+    "url": "https://github.com/Tbristo01/scratchpool/issues"
+  }
+}

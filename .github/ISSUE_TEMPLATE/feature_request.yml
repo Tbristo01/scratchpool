@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a change to the local pool.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        scratchpool stays deliberately small: a pool on your own machine, your own Dev Hub, zero dependencies, no hosted server.
+        Requests for single-org features usually belong upstream in sf-skills `dx-org-manage`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What slows you down today? Include timings if you have them.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Commands, flags or config keys you would expect.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This works without a hosted server or shared credentials.
+        - label: This needs no new runtime dependency.

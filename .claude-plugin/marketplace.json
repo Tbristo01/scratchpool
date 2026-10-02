@@ -1,0 +1,16 @@
+{
+  "name": "scratchpool",
+  "description": "scratchpool: a warm pool of ready Salesforce scratch orgs, managed locally on your own machine.",
+  "owner": {
+    "name": "Tishaun Bristol",
+    "url": "https://github.com/Tbristo01"
+  },
+  "plugins": [
+    {
+      "name": "scratchpool",
+      "source": "./",
+      "description": "Claim a pre-built, pre-configured Salesforce scratch org in seconds; your OS scheduler refills the pool in the background with your own Dev Hub. No server.",
+      "category": "development"
+    }
+  ]
+}

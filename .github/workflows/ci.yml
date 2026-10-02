@@ -1,0 +1,140 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Every action is pinned to a full commit SHA (release tag in the trailing comment).
+# Dependabot (.github/dependabot.yml) proposes updates.
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 22]
+    env:
+      # Belt and braces: tests use a stub sf and must never touch a real scheduler.
+      SCRATCHPOOL_SERVICE_DRYRUN: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Zero runtime dependencies
+        shell: bash
+        run: |
+          node -e '
+            const p = require("./package.json");
+            for (const k of ["dependencies","optionalDependencies","peerDependencies","bundleDependencies"]) {
+              if (p[k] && Object.keys(p[k]).length) { console.error(`package.json must not declare ${k}`); process.exit(1); }
+            }'
+      - run: npm test
+
+  secrets:
+    name: secret-pattern scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Grep tracked files for credential shapes
+        shell: bash
+        run: |
+          # Real credential SHAPES, not the redaction regexes the code and docs mention.
+          # sfdxAuthUrl, org access tokens (00D...!...), private keys, common vendor tokens.
+          patterns=(
+            'force://[A-Za-z0-9_.~-]+:[A-Za-z0-9_.~-]*:[A-Za-z0-9_.~-]{20,}@'
+            '00D[A-Za-z0-9]{12,15}![A-Za-z0-9._]{40,}'
+            '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+            'gh[pousr]_[A-Za-z0-9]{36,}'
+            'npm_[A-Za-z0-9]{36}'
+            'AKIA[0-9A-Z]{16}'
+            'xox[baprs]-[A-Za-z0-9-]{10,}'
+          )
+          # Test fixtures may carry deliberately fake credentials to prove redaction; such lines
+          # must contain the marker FAKE and are reported but not failed.
+          found=0
+          for p in "${patterns[@]}"; do
+            hits=$(git grep -nIE -e "$p" -- . ':!.github/workflows/ci.yml' || true)
+            [ -z "$hits" ] && continue
+            fakes=$(printf '%s\n' "$hits" | grep 'FAKE' || true)
+            real=$(printf '%s\n' "$hits" | grep -v 'FAKE' || true)
+            [ -n "$fakes" ] && printf 'allowed (FAKE marker):\n%s\n' "$fakes"
+            if [ -n "$real" ]; then printf '%s\n' "$real"; found=1; fi
+          done
+          if [ "$found" -ne 0 ]; then
+            echo "::error::Credential-shaped strings found. Remove them; test fixtures must use obvious fakes marked FAKE."
+            exit 1
+          fi
+          echo "No credential shapes found."
+
+  shellcheck:
+    name: shellcheck examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: shellcheck examples/*.sh
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(examples/*.sh)
+          if [ ${#files[@]} -eq 0 ]; then echo "no examples/*.sh"; exit 0; fi
+          shellcheck --version
+          shellcheck "${files[@]}"
+
+  manifests:
+    name: validate manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Parse JSON and cross-check plugin, marketplace and package
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, existsSync } from "node:fs";
+            const read = (f) => { try { return JSON.parse(readFileSync(f, "utf8")); } catch (e) { console.error(`${f}: ${e.message}`); process.exit(1); } };
+            const plugin = read(".claude-plugin/plugin.json");
+            const market = read(".claude-plugin/marketplace.json");
+            const pkg = read("package.json");
+            if (existsSync("examples/settings.deny.json")) read("examples/settings.deny.json");
+            const fail = (m) => { console.error(m); process.exit(1); };
+            if (!plugin.name || !plugin.version) fail("plugin.json needs name and version");
+            if (!market.name || !market.owner?.name || !Array.isArray(market.plugins)) fail("marketplace.json needs name, owner.name, plugins[]");
+            const entry = market.plugins.find((p) => p.name === plugin.name);
+            if (!entry) fail(`marketplace.json has no entry named ${plugin.name}`);
+            if (entry.source !== "./") fail("marketplace entry source must be \"./\" (repo is both marketplace and plugin)");
+            if ("version" in entry || "version" in market) fail("version lives only in plugin.json");
+            if (pkg.version !== plugin.version) fail(`package.json ${pkg.version} != plugin.json ${plugin.version}`);
+            if (!existsSync(pkg.bin?.scratchpool ?? "")) fail(`bin target missing: ${pkg.bin?.scratchpool}`);
+            if (existsSync("bin")) fail("no top-level bin/ directory (claude.ai org sync rejects it)");
+            console.log(`ok: ${plugin.name}@${plugin.version}`);
+          '
+      - name: Validate SKILL.md frontmatter name
+        shell: bash
+        run: |
+          f=skills/scratchpool/SKILL.md
+          test -f "$f"
+          head -1 "$f" | grep -qx -- '---'
+          grep -qE '^name: *scratchpool *$' "$f"
+          grep -qE '^description: *.+' "$f"
+          echo "ok: $f"

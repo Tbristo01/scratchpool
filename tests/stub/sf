@@ -1,0 +1,185 @@
+#!/usr/bin/env node
+// Stub `sf` CLI for scratchpool tests. NEVER talks to Salesforce.
+//
+// Driven by a scenario JSON file (env SCRATCHPOOL_STUB_SCENARIO):
+// {
+//   "version": "2.150.0",                       // sf --version
+//   "defaultHub": "devhub" | null,              // sf config get target-dev-hub
+//   "hubs": [{"alias":"devhub","username":"me@corp.com"}],
+//   "limits": {"ActiveScratchOrgs":{"max":40,"remaining":40},"DailyScratchOrgs":{"max":80,"remaining":80}},
+//   "scratchOrgs": [ {alias,username,orgId,expirationDate,devHubUsername,isExpired,instanceUrl} ],  // initial local orgs
+//   "hubRecords": [ {Id,SignupUsername,Description,ExpirationDate,Status} ],                        // initial hub records
+//   "fail": { "<command key>": {exitCode,name,message, match?:[substr...], times?:n} | [ ...same ] }
+// }
+// Command keys: "--version", "config get", "config set", "org display", "org list", "org list limits",
+// "org create scratch", "org delete scratch", "alias set", "alias unset", "data query", "org open".
+//
+// Mutable stub state (local orgs + hub records) lives in <scenario>.db.json; every invocation's argv
+// (plus cwd) is appended as one JSON line to <scenario>.calls.jsonl.
+// Written with process.getBuiltinModule so it runs whether Node treats it as CJS or ESM.
+'use strict';
+const fs = process.getBuiltinModule('node:fs');
+const crypto = process.getBuiltinModule('node:crypto');
+
+const scenarioPath = process.env.SCRATCHPOOL_STUB_SCENARIO;
+if (!scenarioPath) {
+  process.stderr.write('stub sf: SCRATCHPOOL_STUB_SCENARIO not set\n');
+  process.exit(2);
+}
+const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
+const dbPath = scenarioPath + '.db.json';
+const callsPath = scenarioPath + '.calls.jsonl';
+const countsPath = scenarioPath + '.counts.json';
+const argv = process.argv.slice(2);
+
+fs.appendFileSync(callsPath, JSON.stringify({ argv, cwd: process.cwd() }) + '\n');
+
+let db;
+try { db = JSON.parse(fs.readFileSync(dbPath, 'utf8')); } catch {
+  db = { scratchOrgs: structuredClone(scenario.scratchOrgs || []), hubRecords: structuredClone(scenario.hubRecords || []) };
+}
+const saveDb = () => fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+
+const KEYS = ['--version', 'config get', 'config set', 'org display', 'org list limits', 'org list',
+  'org create scratch', 'org delete scratch', 'alias set', 'alias unset', 'data query', 'org open'];
+const words = [];
+for (const a of argv) { if (a.startsWith('-')) break; words.push(a); }
+const joined = argv[0] === '--version' ? '--version' : words.join(' ');
+const key = KEYS.find((k) => joined === k || joined.startsWith(k + ' '));
+
+function flag(...names) {
+  for (let i = 0; i < argv.length; i++) if (names.includes(argv[i])) return argv[i + 1];
+  return undefined;
+}
+function out(obj, code = 0) {
+  process.stdout.write(typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2));
+  process.stdout.write('\n');
+  process.exit(code);
+}
+function fail(code, name, message) {
+  out({ status: code, name, message, exitCode: code, warnings: [] }, code);
+}
+function now() { return process.env.SCRATCHPOOL_NOW ? new Date(process.env.SCRATCHPOOL_NOW) : new Date(); }
+function hex(n) { return crypto.randomBytes(n).toString('hex'); }
+
+if (!key) fail(2, 'UnknownCommand', `stub sf: command not in allowlist: ${argv.join(' ')}`);
+
+// Injected failures.
+{
+  let rules = scenario.fail && scenario.fail[key];
+  if (rules && !Array.isArray(rules)) rules = [rules];
+  if (rules) {
+    let counts = {};
+    try { counts = JSON.parse(fs.readFileSync(countsPath, 'utf8')); } catch {}
+    for (let i = 0; i < rules.length; i++) {
+      const r = rules[i];
+      if (r.match && !r.match.every((m) => argv.some((a) => a.includes(m)))) continue;
+      const ck = `${key}#${i}`;
+      if (r.times != null && (counts[ck] || 0) >= r.times) continue;
+      counts[ck] = (counts[ck] || 0) + 1;
+      fs.writeFileSync(countsPath, JSON.stringify(counts));
+      if (r.raw != null) { process.stdout.write(r.raw); process.exit(r.exitCode ?? 1); }
+      fail(r.exitCode ?? 1, r.name || 'StubError', r.message || 'stub failure');
+    }
+  }
+}
+
+const hubs = scenario.hubs || [];
+const findHub = (x) => hubs.find((h) => h.alias === x || h.username === x);
+const findOrg = (x) => db.scratchOrgs.find((o) => o.alias === x || o.username === x);
+
+switch (key) {
+  case '--version':
+    out(`@salesforce/cli/${scenario.version || '2.150.0'} darwin-arm64 node-v22.12.0`);
+    break;
+  case 'config get':
+    out({ status: 0, result: [{ name: 'target-dev-hub', value: scenario.defaultHub ?? undefined, location: 'Global', success: true }], warnings: [] });
+    break;
+  case 'config set':
+    out({ status: 0, result: { successes: [{ name: argv[2].split('=')[0], value: argv[2].split('=')[1], success: true }], failures: [] }, warnings: [] });
+    break;
+  case 'org display': {
+    const target = flag('-o', '--target-org');
+    const h = findHub(target);
+    const o = h ? null : findOrg(target);
+    if (!h && !o) fail(1, 'NamedOrgNotFoundError', `No authorization information found for ${target}.`);
+    const u = h || o;
+    out({ status: 0, result: { id: '00DHUB000000000AAA', username: u.username, alias: u.alias, instanceUrl: 'https://hub.my.salesforce.com', connectedStatus: 'Connected' }, warnings: [] });
+    break;
+  }
+  case 'org list':
+    out({ status: 0, result: {
+      devHubs: hubs.map((h) => ({ alias: h.alias, username: h.username, isDevHub: true, orgId: '00DHUB000000000AAA', connectedStatus: 'Connected' })),
+      nonScratchOrgs: [],
+      scratchOrgs: db.scratchOrgs.map((o) => ({ ...o, accessToken: '00DFAKE000000000001!FAKEACCESSTOKENLISTxyz' })),
+      sandboxes: [], other: [] }, warnings: [] });
+    break;
+  case 'org list limits': {
+    const L = scenario.limits || { ActiveScratchOrgs: { max: 40, remaining: 40 }, DailyScratchOrgs: { max: 80, remaining: 80 } };
+    out({ status: 0, result: Object.entries(L).map(([name, v]) => ({ name, max: v.max, remaining: v.remaining })), warnings: [] });
+    break;
+  }
+  case 'org create scratch': {
+    const hubArg = flag('-v', '--target-dev-hub');
+    const h = findHub(hubArg);
+    if (!h) fail(1, 'NoDefaultDevHubError', `No hub ${hubArg}`);
+    const alias = flag('-a', '--alias');
+    const days = Number(flag('-y', '--duration-days') || 7);
+    const exp = new Date(now().getTime() + days * 86400000).toISOString().slice(0, 10);
+    const username = `test-${hex(6)}@example.com`;
+    const orgId = '00D' + hex(8).toUpperCase().slice(0, 15);
+    const org = { alias, username, orgId, expirationDate: exp, devHubUsername: h.username, isExpired: false,
+      instanceUrl: `https://${alias || 'x'}.scratch.my.salesforce.com` };
+    db.scratchOrgs.push(org);
+    db.hubRecords.push({ Id: '2SR' + hex(6), SignupUsername: username, Description: flag('--description') || null,
+      ExpirationDate: exp, Status: 'Active', CreatedDate: now().toISOString() });
+    saveDb();
+    out({ status: 0, result: {
+      username, orgId, scratchOrgInfo: { Id: '2SR000', ExpirationDate: exp, SignupUsername: username, Status: 'Active', LoginUrl: 'https://login.example.com' },
+      authFields: { accessToken: '00DFAKE000000000001!FAKEACCESSTOKENabc', refreshToken: '5AepFAKEREFRESHTOKEN', sfdxAuthUrl: 'force://FAKECLIENT::5AepFAKEREFRESHTOKEN@fake.my.salesforce.com', loginUrl: 'https://fake.my.salesforce.com', instanceUrl: org.instanceUrl, username, orgId },
+      warnings: [] }, warnings: [] });
+    break;
+  }
+  case 'org delete scratch': {
+    const t = flag('-o', '--target-org');
+    const o = findOrg(t);
+    if (!o) fail(1, 'NamedOrgNotFoundError', `No authorization information found for ${t}.`);
+    db.scratchOrgs = db.scratchOrgs.filter((x) => x !== o);
+    for (const r of db.hubRecords) if (r.SignupUsername === o.username) r.Status = 'Deleted';
+    saveDb();
+    out({ status: 0, result: { orgId: o.orgId, username: o.username }, warnings: [] });
+    break;
+  }
+  case 'alias set': {
+    const [a, u] = argv[2].split('=');
+    for (const o of db.scratchOrgs) if (o.alias === a) o.alias = undefined;
+    const o = findOrg(u);
+    if (o) o.alias = a;
+    saveDb();
+    out({ status: 0, result: [{ alias: a, value: u, success: true }], warnings: [] });
+    break;
+  }
+  case 'alias unset': {
+    const a = argv[2];
+    for (const o of db.scratchOrgs) if (o.alias === a) o.alias = undefined;
+    saveDb();
+    out({ status: 0, result: [{ alias: a, success: true }], warnings: [] });
+    break;
+  }
+  case 'data query': {
+    // Mirror the real Dev Hub: Description is a long text area and cannot be filtered in SOQL.
+    const soql = flag('-q', '--query') || '';
+    if (/Description\s+LIKE/i.test(soql)) {
+      fail(1, 'INVALID_FIELD', "field 'Description' can not be filtered in a query call");
+    }
+    // Real orgs return every Active record, tagged or not.
+    const recs = db.hubRecords.filter((r) => r.Status === 'Active');
+    out({ status: 0, result: { records: recs, totalSize: recs.length, done: true }, warnings: [] });
+    break;
+  }
+  case 'org open':
+    out({ status: 0, result: { orgId: 'x', url: 'https://x/secur/frontdoor.jsp?sid=SECRET' }, warnings: [] });
+    break;
+  default:
+    fail(2, 'UnknownCommand', 'unreachable');
+}

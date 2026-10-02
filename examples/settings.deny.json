@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(sf org auth show *)",
+      "Bash(sf org auth show-*)",
+      "Bash(sf org display --verbose*)",
+      "Bash(sf org display *--verbose*)",
+      "Bash(sf org display user*)",
+      "Bash(sf org generate password*)",
+      "Bash(sf org open *--url-only*)",
+      "Bash(sf org open -r*)",
+      "Bash(sf org open * -r*)",
+      "Bash(sf org open *--json*)",
+      "Bash(sf org list *--verbose*)",
+      "Bash(sfdx force:org:display *--verbose*)",
+      "Bash(*SF_TEMP_SHOW_SECRETS*)",
+      "Bash(export SF_TEMP_SHOW_SECRETS*)",
+      "Bash(* ~/.sf/*)",
+      "Bash(* ~/.sfdx/*)",
+      "Bash(*/.sf/*)",
+      "Bash(*/.sfdx/*)",
+      "Bash(*.config/scratchpool*)",
+      "Bash(*.scratchpool/setup*)",
+      "Read(~/.sf/**)",
+      "Read(~/.sfdx/**)",
+      "Edit(~/.config/scratchpool/**)",
+      "Edit(./.scratchpool/**)"
+    ]
+  }
+}

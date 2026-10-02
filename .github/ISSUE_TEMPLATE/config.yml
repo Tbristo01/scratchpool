@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/Tbristo01/scratchpool/security/advisories/new
+    about: Do not open a public issue for security problems. Use GitHub private vulnerability reporting.
+  - name: Questions about creating a single scratch org
+    url: https://github.com/forcedotcom/sf-skills
+    about: scratchpool only manages a pool. For one-off org creation, sf-skills dx-org-manage or the sf CLI is the right tool.
