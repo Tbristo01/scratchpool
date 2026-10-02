@@ -289,9 +289,23 @@ WantedBy=timers.target
 `;
 }
 
-// POSIX shell single-quote; '%' is special in crontab and must be escaped.
+// POSIX shell single-quote: inside '...' every character is literal except the quote itself ('\'').
 function shQuote(s) {
   return `'${String(s).replace(/'/g, `'\\''`)}'`;
+}
+
+// A shell-quoted word for a crontab command. cron (cronie / Vixie) reads the command before the shell does:
+// a newline ends the entry, an unescaped '%' ends the command (the rest becomes stdin), "\%" yields '%',
+// and "\\" is consumed as a pair, so a value with a backslash right before '%' cannot be protected by
+// prefixing the '%' alone (that was CodeQL js/incomplete-sanitization). Instead each '%' is emitted
+// OUTSIDE the single quotes as \% ('a'\%'b'), where the character before the escaping backslash is
+// always a quote, never a backslash; '\' and every other character stay inside quotes, inert. Control
+// characters cannot be written into a crontab line at all and are rejected.
+export function cronShQuote(s) {
+  const v = String(s);
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(v)) throw svcError('USAGE', 'service: a crontab value contains a control character');
+  return shQuote(v).split('%').join(`'\\%'`);
 }
 
 export function buildCrontabLine({ home, nodePath, scriptPath, sfPath, intervalMinutes }) {
@@ -301,14 +315,14 @@ export function buildCrontabLine({ home, nodePath, scriptPath, sfPath, intervalM
   else schedule = `0 * * * *`;
   const log = path.join(home, 'logs', 'cron.log');
   const cmd = [
-    `PATH=${shQuote(schedulerPath(nodePath, sfPath))}`,
-    `SCRATCHPOOL_HOME=${shQuote(home)}`,
-    shQuote(nodePath),
-    shQuote(scriptPath),
+    `PATH=${cronShQuote(schedulerPath(nodePath, sfPath))}`,
+    `SCRATCHPOOL_HOME=${cronShQuote(home)}`,
+    cronShQuote(nodePath),
+    cronShQuote(scriptPath),
     'tick --json',
-    `>> ${shQuote(log)} 2>&1`,
+    `>> ${cronShQuote(log)} 2>&1`,
   ].join(' ');
-  return `${schedule} ${cmd.replace(/%/g, '\\%')}`;
+  return `${schedule} ${cmd}`;
 }
 
 function linuxPaths(home, dryRun) {
@@ -527,4 +541,4 @@ export function serviceStatus(options = {}) {
 }
 
 // Exposed for tests only.
-export const _internal = { xmlEscape, xmlUnescape, systemdQuote, systemdUnquote, shQuote };
+export const _internal = { xmlEscape, xmlUnescape, systemdQuote, systemdUnquote, shQuote, cronShQuote };

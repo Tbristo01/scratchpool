@@ -20,8 +20,8 @@ jobs:
     steps:
       # fail-on-scopes filters the changes before BOTH the vulnerability and the license check run
       # (src/main.ts), so the two checks are separate steps with different scopes.
-      # Advisory check: it is not a required status check on main, so a failure flags the PR but does
-      # not by itself prevent the merge (see docs/repository-controls.md).
+      # Required check: `dependency review` is a required status check on main, so a failure blocks the
+      # merge (see docs/repository-controls.md). Renaming this job silently drops it from the gate.
       - name: Vulnerabilities (all dependency scopes)
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:

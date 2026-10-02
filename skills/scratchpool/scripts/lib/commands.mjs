@@ -139,7 +139,12 @@ function cmpVersion(a, b) {
   return 0;
 }
 
+// A Dev Hub is named by an sf alias or a username (an email address). It reaches the sf command line
+// (`sf org display -o <hub>`, and every later call), so it is allowlisted like a pool alias.
+const HUB_RE = /^[A-Za-z0-9][A-Za-z0-9._@+'-]{0,254}$/;
+
 function verifyHub(ctx, hub) {
+  if (!HUB_RE.test(String(hub))) fail('USAGE', `invalid Dev Hub ${JSON.stringify(String(hub).slice(0, 100))}: use an sf alias or username (letters, digits, . _ - @ + ')`);
   let hubUsername;
   try { hubUsername = ctx.sf.hubUsername(hub); } catch (e) {
     if (e.code === 'SF_MISSING') throw e;
@@ -353,7 +358,10 @@ function kickTickIfIdle(ctx, name, pool) {
 
 function finishClaim(ctx, flags, out, name, replenish) {
   if (replenish) kickTick(ctx, name);
-  if (process.stdout.isTTY && !jsonMode(flags) && !flags['no-open'] && out.alias) ctx.sf.open(out.alias);
+  if (process.stdout.isTTY && !jsonMode(flags) && !flags['no-open'] && out.alias) {
+    const why = ctx.sf.open(out.alias);
+    if (why) out.warnings.push(`OPEN_FAILED: the org was claimed but not opened in a browser: ${why}`);
+  }
   return withPool(out, ctx, name);
 }
 

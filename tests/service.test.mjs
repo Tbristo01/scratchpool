@@ -211,7 +211,8 @@ describe('linux (systemd --user)', () => {
         assert.ok(err.crontab.startsWith('*/15 * * * * '));
         assert.ok(err.crontab.includes("'/Users/Jane Doe/.nvm/versions/node/v22.0.0/bin/node'"));
         assert.ok(err.crontab.includes('tick --json'));
-        assert.ok(err.crontab.includes('my 100\\% '), '% must be escaped for crontab');
+        assert.ok(err.crontab.includes("my 100'\\%' "), '% must be escaped for crontab, outside the single quotes');
+        assert.ok(!/[^\\]%/.test(err.crontab), 'no unescaped %');
         return true;
       },
     );

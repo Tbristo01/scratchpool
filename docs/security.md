@@ -25,6 +25,15 @@ how, and what it does not try to do. To report a vulnerability, see `SECURITY.md
   is you. Credentials are never handed from one person to another.
 - The scheduler entry is per user (a LaunchAgent, a user systemd timer, or a user scheduled
   task). It needs no administrator rights and runs nothing as root.
+- `sf` is spawned with an argument array, never a shell string. On Windows, where `sf.cmd` has
+  to run through `cmd.exe`, cmd parses the line at least twice (the `cmd /c` line and the shim's
+  `%*`) and three times with the official Salesforce CLI installer, whose `sf.cmd` passes `%*` on
+  to a second `sf.cmd` in `%LOCALAPPDATA%\sf\client\bin`. Every argument is quoted and
+  caret-escaped for the first two parses, and an argument or `sf` path containing `"`, `%` or a
+  control character is refused with `USAGE`, so later parses see only plain quoted strings and
+  keep them literal however many there are. A Dev Hub given to `init --hub` or `config set hub`
+  must be an sf alias or username. The crontab line printed when
+  systemd `--user` is missing escapes `%` the way cron needs and refuses control characters.
 
 ### Credentials leaking into the transcript
 

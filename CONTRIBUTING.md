@@ -38,9 +38,11 @@ Useful environment variables for local runs:
 
 ## Pull requests
 
+All changes, including the maintainer's, go through a pull request: `main` is protected for everyone (admins included), so a direct push is rejected. A PR merges only when all 11 required checks pass (the 9 CI jobs, `dependency review` and `CodeQL`) on a branch that is up to date with `main` and every review conversation is resolved. PRs are squash-merged; GitHub signs the squash commit, so you do not need to sign your own commits (it is welcome). Details: [docs/repository-controls.md](docs/repository-controls.md).
+
 1. Open an issue first for anything beyond a small fix.
 2. Keep PRs focused; add or update tests in `tests/`.
-3. Run `npm test`. CI runs it on ubuntu, macOS and Windows with Node 20 and 22, plus a secret-shape scan, shellcheck on `examples/*.sh` and manifest validation.
+3. Run `npm test`. CI runs it on ubuntu, macOS and Windows with Node 20 and 22, plus a secret-shape scan, shellcheck on `examples/*.sh` and manifest validation; dependency review and CodeQL run alongside. All of them are required.
 4. Add a line under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
 5. Test fixtures must use obviously fake credentials, and any line holding a token-shaped value must contain the marker `FAKE` (the CI secret scan fails on unmarked matches).
 

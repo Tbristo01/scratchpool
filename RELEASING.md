@@ -28,6 +28,8 @@ CI (`validate manifests`) checks that all three agree on every PR; the release w
 
 ## 4. Open a PR and merge it
 
+`main` accepts changes only through a pull request, for the maintainer too (`enforce_admins` is on): a direct push is rejected with `GH006`. The PR needs all 11 required checks green on a branch that is up to date with `main`, and merges only by squash; the squash commit is signed by GitHub, which satisfies the signed-commit rule on `main`.
+
 ```sh
 git switch -c release/vX.Y.Z
 git commit -am "release: vX.Y.Z"
@@ -45,7 +47,7 @@ git tag -a vX.Y.Z -m "scratchpool vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Use an annotated tag (`-a`). Once pushed, a `v*` tag is protected by the tag ruleset: it cannot be moved or deleted except by a repository admin bypassing the ruleset, and by policy we never do that for a published release. Check the commit before pushing.
+Use an annotated tag (`-a`). Once pushed, a `v*` tag is protected by the tag ruleset, which has no bypass actors: no one, admins included, can move or delete it. Check the commit before pushing.
 
 ## 6. Approve the release environment
 
@@ -56,7 +58,7 @@ gh run list --workflow release --limit 1
 gh run view <run-id>   # status "waiting"
 ```
 
-Approve it from the run page (**Review deployments**, tick `release`, **Approve and deploy**). Only approve a run whose tag and commit you just pushed. Admins can bypass this approval; don't.
+Approve it from the run page (**Review deployments**, tick `release`, **Approve and deploy**). Only approve a run whose tag and commit you just pushed. Admins cannot bypass this approval (`can_admins_bypass` is off).
 
 ## 7. Verify the published release
 
