@@ -26,25 +26,48 @@ export function resolveSf(configSfPath) {
   return onPath(isWin() ? ['sf.cmd', 'sf.exe', 'sf'] : ['sf']);
 }
 
-// Windows: Node refuses to spawn .cmd/.bat without a shell (CVE-2024-27980). Go through cmd.exe, escaping
-// the way cross-spawn does; still built from an array, never interpolated from free text (aliases are
-// validated against ALIAS_RE before they get here).
-// cmd metacharacters, including space and comma, which split tokens when not inside cmd's quote mode.
-const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
+// Windows: Node refuses to spawn .cmd/.bat without a shell (CVE-2024-27980), so the call goes through
+// cmd.exe. The line is still built from an argument array, never from interpolated free text, and every
+// piece of it goes through the routine below (aliases and snapshot names are also allowlisted upstream).
+//
+// cmd.exe parses the line twice: once for `cmd /c`, and again when the batch shim (sf.cmd: `node ... %*`)
+// expands %* into its own command line. The policy, applied to the command path and to every argument:
+//   * REJECT (WIN_UNSAFE) what cannot be escaped on a cmd line: control characters (CR and LF end the
+//     command; NUL truncates it) and '%' (%VAR% is expanded before carets are seen, and the %VAR:a=b%
+//     substitution form defeats caret tricks).
+//   * ESCAPE every other cmd metacharacter with a caret (CMD_META: ( ) [ ] ! ^ " ` < > & | ; , = * ? space).
+//     A caret-escaped quote never enters cmd's quote mode, so no metacharacter is ever "inside quotes" to
+//     cmd; arguments are caret-escaped TWICE (one layer per parse) so the batch re-parse of %* sees them
+//     escaped too, the way cross-spawn escapes npm cmd-shims.
+//   * '!' is escaped as well, and cmd runs with /v:off so delayed expansion is off whatever the registry says.
+// eslint-disable-next-line no-control-regex
+const WIN_UNSAFE = /[\u0000-\u001f\u007f%]/;
+const CMD_META = /([()\][!^"`<>&|;,= *?])/g;
+
+export function winCheck(s, what) {
+  const v = String(s);
+  if (WIN_UNSAFE.test(v)) {
+    throw new SpError('USAGE', `${what} cannot be passed safely through cmd.exe: it contains '%' or a control character`);
+  }
+  return v;
+}
 // The command token: caret-escape metacharacters (spaces too) without quoting, so a path such as
-// C:\Program Files\sf\bin\sf.cmd stays one token. (A caret-escaped quote does not enter quote mode.)
+// C:\Program Files\sf\bin\sf.cmd stays one token. It is parsed once (the shim sees it only as %~dp0).
 export function winEscapeCommand(cmd) {
-  return String(cmd).replace(CMD_META, '^$1');
+  return winCheck(cmd, 'the sf path').replace(CMD_META, '^$1');
 }
-// An argument: MSVCRT-quote it (backslashes before a quote doubled), then caret-escape every metacharacter.
-export function winQuote(a) {
-  let s = String(a);
-  s = s.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1');
-  return `"${s}"`.replace(CMD_META, '^$1');
+// An argument: MSVCRT-quote it (backslashes before a quote, and trailing ones, doubled; quotes as \"),
+// then caret-escape every metacharacter, once per cmd parse (`times`, default 2 for a batch shim).
+export function winQuote(a, times = 2) {
+  let s = winCheck(a, 'an sf argument');
+  s = `"${s.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`;
+  for (let i = 0; i < times; i++) s = s.replace(CMD_META, '^$1');
+  return s;
 }
-// argv for cmd.exe running a .cmd/.bat: /s strips the outer quote pair we add around the whole line.
+// argv for cmd.exe running a .cmd/.bat: /d skips AutoRun, /v:off disables delayed expansion, and /s strips
+// the outer quote pair we add around the whole line.
 export function winCmdArgv(bin, args) {
-  return ['/d', '/s', '/c', `"${[winEscapeCommand(bin), ...args.map(winQuote)].join(' ')}"`];
+  return ['/d', '/v:off', '/s', '/c', `"${[winEscapeCommand(bin), ...args.map((a) => winQuote(a))].join(' ')}"`];
 }
 
 export class Sf {

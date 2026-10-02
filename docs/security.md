@@ -25,6 +25,11 @@ how, and what it does not try to do. To report a vulnerability, see `SECURITY.md
   is you. Credentials are never handed from one person to another.
 - The scheduler entry is per user (a LaunchAgent, a user systemd timer, or a user scheduled
   task). It needs no administrator rights and runs nothing as root.
+- `sf` is spawned with an argument array, never a shell string. On Windows, where `sf.cmd` has
+  to run through `cmd.exe`, every argument is quoted and caret-escaped for both cmd parses (the
+  `cmd /c` line and the shim's `%*`), and an argument or `sf` path containing `%` or a control
+  character is refused with `USAGE` because cmd cannot escape it. The crontab line printed when
+  systemd `--user` is missing escapes `%` the way cron needs and refuses control characters.
 
 ### Credentials leaking into the transcript
 

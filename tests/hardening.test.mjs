@@ -228,13 +228,14 @@ test('sf binary in a directory with spaces (exercises the cmd.exe quoting on Win
   } finally { t.cleanup(); }
 });
 
-test('cmd.exe escaping: the command token stays one token; arguments are quoted then caret-escaped', () => {
+test('cmd.exe escaping: the command token stays one token; arguments are quoted then caret-escaped once per cmd parse', () => {
   assert.equal(winEscapeCommand('C:\\Program Files\\sf\\bin\\sf.cmd'), 'C:\\Program^ Files\\sf\\bin\\sf.cmd');
-  assert.equal(winQuote('a b&c'), '^"a^ b^&c^"');
-  assert.equal(winQuote('x\\'), '^"x\\\\^"');
+  assert.equal(winQuote('a b&c', 1), '^"a^ b^&c^"');
+  assert.equal(winQuote('a b&c'), '^^^"a^^^ b^^^&c^^^"');
+  assert.equal(winQuote('x\\', 1), '^"x\\\\^"');
   const argv = winCmdArgv('C:\\a b\\sf.cmd', ['org', 'list']);
-  assert.deepEqual(argv.slice(0, 3), ['/d', '/s', '/c']);
-  assert.equal(argv[3], '"C:\\a^ b\\sf.cmd ^"org^" ^"list^""');
+  assert.deepEqual(argv.slice(0, 4), ['/d', '/v:off', '/s', '/c']);
+  assert.equal(argv[4], '"C:\\a^ b\\sf.cmd ^^^"org^^^" ^^^"list^^^""');
 });
 
 test('detached workers (no SCRATCHPOOL_NO_DETACH): tick returns at once and the worker reaches ready', async () => {

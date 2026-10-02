@@ -4,12 +4,12 @@ scratchpool is a small, single-maintainer open source project. This document say
 
 ## Model
 
-scratchpool follows a benevolent-dictator-for-life (BDFL) model. The maintainer, [@Tbristo01](https://github.com/Tbristo01), has final say on scope, design, releases and who gets write access. With one maintainer this is simply honest: the same person reviews, merges and releases, and the [repository controls](docs/repository-controls.md) (required checks, protected tags, an approval-gated release environment, provenance attestations) are what keep that person honest.
+scratchpool follows a benevolent-dictator-for-life (BDFL) model. The maintainer, [@Tbristo01](https://github.com/Tbristo01), has final say on scope, design, releases and who gets write access. With one maintainer this is simply honest: the same person reviews, merges and releases, and the [repository controls](docs/repository-controls.md) (pull requests required for every change, signed squash-only merges, 11 required checks, protected tags and an approval-gated release environment with no admin bypass, provenance attestations) are what keep that person honest. Branch protection is enforced for admins, so the maintainer's own changes go through the same PR flow as anyone's.
 
 ## How decisions are made
 
 - **The contract is [docs/SPEC.md](docs/SPEC.md).** A change in behaviour is a change to the spec, proposed in the same PR, with the reason.
-- **Small fixes** go straight to a pull request.
+- **Every change goes through a pull request**, the maintainer's included: `main` rejects direct pushes from everyone. Small fixes go straight to a PR.
 - **Anything larger** (a new command, a config key, a change to what `sf` commands may run, a new install path) starts as an issue so the trade-off is discussed before code is written.
 - **Scope** is guided by the roadmap and the kill criteria in [docs/design-rationale.md](docs/design-rationale.md). Proposals that turn scratchpool into a hosted or shared service, add runtime dependencies, or widen what it can delete are likely to be declined.
 - The maintainer decides, explains the decision in the issue or PR, and records user-visible outcomes in [CHANGELOG.md](CHANGELOG.md).
