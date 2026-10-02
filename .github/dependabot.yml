@@ -4,5 +4,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # One PR per week for all action bumps, so the pinned SHAs move together.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    labels:
+      - dependencies
+      - github_actions
     commit-message:
       prefix: ci

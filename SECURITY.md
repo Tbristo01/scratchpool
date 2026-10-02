@@ -29,7 +29,7 @@ The full model is in [docs/security.md](docs/security.md). In short:
 - **Your credentials, your orgs.** Pool orgs are created by your own Dev Hub auth on your own machine. scratchpool stores the Dev Hub alias, never a token, and never shares or hands off credentials.
 - **Secrets never reach output.** `sf` is spawned with `--json` and argument arrays (no shell strings). Output fields are copied from an allowlist; access tokens, refresh tokens, auth URLs, frontdoor URLs, passwords and `authFields` are never emitted. Every message passed to output or logs is scrubbed. scratchpool refuses to run if `SF_TEMP_SHOW_SECRETS` is set.
 - **Scoped deletes.** `release` only deletes orgs recorded in your own state for the selected pool and created by that pool's Dev Hub.
-- **Supply chain.** Zero runtime dependencies, no install scripts. Releases attach a skill zip and `SHA256SUMS`.
+- **Supply chain.** Zero runtime dependencies, no install scripts. Releases are approval-gated and attach a skill zip, `SHA256SUMS` and a build provenance attestation (`gh attestation verify scratchpool-skill-<v>.zip --repo Tbristo01/scratchpool`). Repository controls are listed in [docs/repository-controls.md](docs/repository-controls.md).
 
 ## In scope
 

@@ -5,6 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/Tbristo01/scratchpool/actions/workflows/ci.yml/badge.svg)](https://github.com/Tbristo01/scratchpool/actions/workflows/ci.yml)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Tbristo01/scratchpool/badge)](https://scorecard.dev/viewer/?uri=github.com/Tbristo01/scratchpool)
 
 ![scratchpool demo: init, status, claim in 1.9 s, query the deployed classes, release, and the same claim from Claude Code](docs/demo/scratchpool-demo.svg)
 
@@ -82,7 +83,7 @@ Limits are checked only before creating, never when claiming. Each claim trigger
 - **Agent permissions.** For agents, merge [examples/settings.deny.json](examples/settings.deny.json) into your Claude Code settings.
 - **Allocations.** Each pool org uses one active slot, and each refill uses one daily create. A Developer Edition Dev Hub allows 3 active and 6 daily, so keep `size 1` there. See [pool-sizing](docs/pool-sizing.md).
 
-Threat model: [docs/security.md](docs/security.md). Report vulnerabilities via [SECURITY.md](SECURITY.md).
+Threat model: [docs/security.md](docs/security.md). Report vulnerabilities via [SECURITY.md](SECURITY.md). Every release zip has a SHA256 checksum and a build provenance attestation (`gh attestation verify scratchpool-skill-<v>.zip --repo Tbristo01/scratchpool`); the repository's checks and balances are listed in [docs/repository-controls.md](docs/repository-controls.md).
 
 ## FAQ
 
@@ -96,7 +97,7 @@ v0.2 will bring a faster warm path, orphan hygiene and snapshot refresh. v1.0 ad
 
 ## Contributing
 
-Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). The tests use a stub `sf` and never touch a real Dev Hub: `npm test`. More docs are in [docs/README.md](docs/README.md).
+Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). How decisions are made: [GOVERNANCE.md](GOVERNANCE.md). How releases are cut: [RELEASING.md](RELEASING.md). The tests use a stub `sf` and never touch a real Dev Hub: `npm test`. More docs are in [docs/README.md](docs/README.md).
 
 ## Credits
 

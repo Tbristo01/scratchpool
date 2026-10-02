@@ -8,9 +8,11 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR cancels that PR's superseded run. Pushes to main each get their own group
+# (keyed by commit SHA) and are never cancelled, so every main commit keeps a complete CI record.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Every action is pinned to a full commit SHA (release tag in the trailing comment).
 # Dependabot (.github/dependabot.yml) proposes updates.
@@ -19,6 +21,7 @@ jobs:
   test:
     name: test (${{ matrix.os }}, node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -47,6 +50,7 @@ jobs:
   secrets:
     name: secret-pattern scan
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,6 +89,7 @@ jobs:
   shellcheck:
     name: shellcheck examples
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -101,6 +106,7 @@ jobs:
   manifests:
     name: validate manifests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

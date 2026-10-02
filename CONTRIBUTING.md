@@ -46,7 +46,7 @@ Useful environment variables for local runs:
 
 ## Releases (maintainer)
 
-Bump `version` in `.claude-plugin/plugin.json` and `package.json` together, move the changelog entries under the new version, then push a `vX.Y.Z` tag. The release workflow builds the skill zip and `SHA256SUMS` and attaches them to a GitHub Release.
+Follow [RELEASING.md](RELEASING.md): CHANGELOG section, version bump in `plugin.json`, `package.json` and `SKILL.md`, a PR, then an annotated `vX.Y.Z` tag. The release workflow waits for approval in the `release` environment, then builds the skill zip, `SHA256SUMS` and a build provenance attestation and publishes the CHANGELOG section as the release notes. Decision making is described in [GOVERNANCE.md](GOVERNANCE.md).
 
 ## Conduct and license
 
