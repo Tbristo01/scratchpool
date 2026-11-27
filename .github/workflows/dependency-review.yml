@@ -23,7 +23,7 @@ jobs:
       # Advisory check: it is not a required status check on main, so a failure flags the PR but does
       # not by itself prevent the merge (see docs/repository-controls.md).
       - name: Vulnerabilities (all dependency scopes)
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           # Fail on a dependency with a known moderate (or worse) advisory, whatever its scope:
           # scratchpool has no runtime dependencies, so devDependencies and Actions are what matter.
@@ -33,7 +33,7 @@ jobs:
           comment-summary-in-pr: on-failure
       - name: Licenses (runtime dependencies)
         if: ${{ !cancelled() }}
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           # License policy applies to runtime dependencies (scratchpool ships none today; this keeps it that way
           # unless the license is one Apache-2.0 can redistribute).
